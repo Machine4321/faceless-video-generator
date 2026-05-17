@@ -1,0 +1,47 @@
+# Environment & secrets
+.env
+token.pickle
+client_secrets.json
+
+# Output directories
+output/
+temp/
+logs/
+uploaded_archive/
+valmiit_videot/
+temp_files/
+
+# Temp media files
+temp_*.mp3
+temp_*.mp4
+temp_bg.mp4
+temp_voice.mp3
+
+# Rendered videos
+ShadowVault_*.mp4
+Vault_*.mp4
+*_thumb.jpg
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Old scripts (kept for reference but not tracked)
+*.txt
+!.env.example
+!README.md
