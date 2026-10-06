@@ -247,22 +247,33 @@ def write_metadata_file(run: PipelineRun, output_dir: Optional[str] = None) -> s
 
 
 def print_metadata_summary(run: PipelineRun) -> None:
-    """Print an attractive summary of the metadata directly to stdout/console."""
+    """Print an attractive summary of the metadata directly to stdout/console safely across all OSes."""
+    import sys
     title = run.content.title if run.content else "Faceless Video"
-    print("\n" + "=" * 65)
-    print("📊 VIDEO METADATA & PROVENANCE SUMMARY")
-    print("=" * 65)
-    print(f"🎬 Video File    : {os.path.basename(run.video.video_path) if run.video else 'N/A'}")
-    print(f"📄 Metadata File : {run.metadata_path or 'N/A'}")
-    print(f"📌 Niche         : {run.niche.upper()}")
-    print(f"🏷️  YouTube Title : {title} #Shorts")
+    summary_lines = [
+        "",
+        "=" * 65,
+        "[METADATA] VIDEO & PROVENANCE SUMMARY",
+        "=" * 65,
+        f"Video File    : {os.path.basename(run.video.video_path) if run.video else 'N/A'}",
+        f"Metadata File : {run.metadata_path or 'N/A'}",
+        f"Niche         : {run.niche.upper()}",
+        f"YouTube Title : {title} #Shorts",
+    ]
     if run.trend_topic:
-        print(f"🔍 Story Source  : {run.trend_topic.source_name or run.trend_topic.source}")
+        summary_lines.append(f"Story Source  : {run.trend_topic.source_name or run.trend_topic.source}")
         if run.trend_topic.source_url:
-            print(f"🔗 Source URL    : {run.trend_topic.source_url[:70]}...")
+            summary_lines.append(f"Source URL    : {run.trend_topic.source_url[:70]}...")
         if run.trend_topic.published_date:
-            print(f"📅 Published Date: {run.trend_topic.published_date}")
-    print(f"🎙️  Voice Actor   : {run.audio.voice if run.audio else 'en-US-ChristopherNeural'}")
+            summary_lines.append(f"Published Date: {run.trend_topic.published_date}")
+    summary_lines.append(f"Voice Actor   : {run.audio.voice if run.audio else 'en-US-ChristopherNeural'}")
     if run.media and run.media.scenes_media:
-        print(f"🖼️  Visual Scenes : {len(run.media.scenes_media)} scenes sourced (Flux AI, 3D Docs, Pexels)")
-    print("=" * 65 + "\n")
+        summary_lines.append(f"Visual Scenes : {len(run.media.scenes_media)} scenes sourced (Flux AI, 3D Docs, Pexels)")
+    summary_lines.extend(["=" * 65, ""])
+
+    output = "\n".join(summary_lines)
+    try:
+        print(output)
+    except UnicodeEncodeError:
+        encoding = sys.stdout.encoding or "ascii"
+        print(output.encode(encoding, errors="replace").decode(encoding))
