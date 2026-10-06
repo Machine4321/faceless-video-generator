@@ -135,7 +135,12 @@ def render_newspaper_frame(
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     sheet_w, sheet_h = 940, 1540
-    paper_color = (244, 239, 230, 255)
+    paper_tints = [
+        (244, 239, 230, 255),  # Vintage warm newsprint
+        (240, 236, 226, 255),  # Aged editorial archive
+        (238, 232, 220, 255),  # Sepia dispatch
+    ]
+    paper_color = random.choice(paper_tints)
     sheet = Image.new("RGBA", (sheet_w, sheet_h), paper_color)
     draw = ImageDraw.Draw(sheet)
 
@@ -143,9 +148,16 @@ def render_newspaper_frame(
     draw.line([(40, 50), (sheet_w - 40, 50)], fill=(30, 30, 30), width=4)
     draw.line([(40, 60), (sheet_w - 40, 60)], fill=(30, 30, 30), width=2)
 
-    # Masthead Name
-    font_masthead = _load_font("serif", size=54, bold=True)
-    draw.text((sheet_w // 2, 115), "THE GLOBAL CHRONICLE", fill=(20, 20, 20), font=font_masthead, anchor="mm")
+    # Dynamic Masthead Name
+    mastheads = [
+        "THE GLOBAL CHRONICLE",
+        "THE DAILY INVESTIGATOR",
+        "THE EVENING DISPATCH",
+        "INTERNATIONAL HERALD",
+        "THE NATIONAL TRIBUNE",
+    ]
+    font_masthead = _load_font("serif", size=52, bold=True)
+    draw.text((sheet_w // 2, 115), random.choice(mastheads), fill=(20, 20, 20), font=font_masthead, anchor="mm")
 
     draw.line([(40, 170), (sheet_w - 40, 170)], fill=(30, 30, 30), width=3)
 
@@ -203,7 +215,8 @@ def render_newspaper_frame(
     draw.multiline_text((sheet_w // 2 + 25, y_body), textwrap.fill(col2_text, width=24), fill=(45, 45, 45), font=font_body, spacing=8)
 
     # Composite physical paper onto dark investigation desk
-    desk = _composite_sheet_on_desk(sheet, desk_color=(18, 16, 14), angle=-1.6, center_y=820)
+    desk_rot = random.uniform(-2.2, -1.2)
+    desk = _composite_sheet_on_desk(sheet, desk_color=(18, 16, 14), angle=desk_rot, center_y=820)
     desk = add_film_grain(desk, intensity=8.0)
     desk.save(dest_path, "JPEG", quality=95)
     return dest_path
@@ -225,7 +238,12 @@ def render_classified_dossier(
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     sheet_w, sheet_h = 920, 1520
-    doc_bg = (230, 224, 212, 255)  # Aged manila parchment
+    doc_tints = [
+        (230, 224, 212, 255),  # Aged manila
+        (235, 228, 218, 255),  # Vintage government parchment
+        (225, 218, 204, 255),  # Cold War archive folder
+    ]
+    doc_bg = random.choice(doc_tints)
     sheet = Image.new("RGBA", (sheet_w, sheet_h), doc_bg)
     draw = ImageDraw.Draw(sheet)
 
@@ -238,10 +256,13 @@ def render_classified_dossier(
     draw.text((sheet_w // 2, 125), "SPECIAL INTELLIGENCE DIVISION // EYES ONLY", fill=(95, 85, 75), font=font_hdr, anchor="mm")
     draw.line([(40, 160), (sheet_w - 40, 160)], fill=(70, 65, 60), width=2)
 
-    # Metadata
+    # Dynamic case and directive reference
+    cid = case_id if case_id != "CASE FILE #8492-X" else f"CASE FILE #{random.randint(1000, 9999)}-X"
+    directive = random.choice(["DIRECTIVE 14-B", "EXECUTIVE ORDER 11905", "FREEDOM OF INFORMATION ACT 552", "NATIONAL SECURITY DIRECTIVE 84"])
+
     font_meta = _load_font("mono", size=24, bold=False)
-    draw.text((50, 195), f"REF: {case_id.upper()}", fill=(50, 45, 40), font=font_meta)
-    draw.text((50, 235), "STATUS: DECLASSIFIED UNDER DIRECTIVE 14-B", fill=(175, 35, 35), font=font_meta)
+    draw.text((50, 195), f"REF: {cid.upper()}", fill=(50, 45, 40), font=font_meta)
+    draw.text((50, 235), f"STATUS: DECLASSIFIED UNDER {directive}", fill=(175, 35, 35), font=font_meta)
     draw.text((50, 275), f"SUBJECT: {title.upper()[:36]}", fill=(50, 45, 40), font=font_meta)
     draw.line([(40, 315), (sheet_w - 40, 315)], fill=(70, 65, 60), width=2)
 
@@ -261,22 +282,26 @@ def render_classified_dossier(
 
         y += 58
 
-    # Red Rubber Stamp (Angled Grunge Stamp)
+    # Dynamic Red Rubber Stamp
+    stamps = ["TOP SECRET", "DECLASSIFIED", "RESTRICTED", "EYES ONLY", "CONFIDENTIAL"]
+    actual_stamp = stamp_text if stamp_text != "TOP SECRET" else random.choice(stamps)
+
     stamp_w, stamp_h = 440, 135
     stamp_img = Image.new("RGBA", (stamp_w, stamp_h), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(stamp_img)
     s_draw.rectangle([6, 6, stamp_w - 6, stamp_h - 6], outline=(195, 30, 30, 230), width=7)
-    font_stamp = _load_font("impact", size=64)
-    s_draw.text((stamp_w // 2, stamp_h // 2), stamp_text.upper(), fill=(195, 30, 30, 230), font=font_stamp, anchor="mm")
+    font_stamp = _load_font("impact", size=60)
+    s_draw.text((stamp_w // 2, stamp_h // 2), actual_stamp.upper(), fill=(195, 30, 30, 230), font=font_stamp, anchor="mm")
 
-    angle = random.choice([-14, -10, 12, 15])
+    angle = random.choice([-14, -10, 10, 13, 16])
     stamp_rot = stamp_img.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
     pos_x = sheet_w - stamp_rot.width - 60
     pos_y = sheet_h - stamp_rot.height - 180
     sheet.paste(stamp_rot, (pos_x, pos_y), stamp_rot)
 
     # Composite physical document onto dark tactical desk
-    desk = _composite_sheet_on_desk(sheet, desk_color=(22, 20, 18), angle=1.7, center_y=820)
+    desk_rot = random.uniform(1.2, 2.2)
+    desk = _composite_sheet_on_desk(sheet, desk_color=(22, 20, 18), angle=desk_rot, center_y=820)
     desk = add_film_grain(desk, intensity=8.0)
     desk.save(dest_path, "JPEG", quality=95)
     return dest_path

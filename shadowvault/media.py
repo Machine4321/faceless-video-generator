@@ -112,6 +112,65 @@ def _download_video(url: str, dest_path: str) -> bool:
         return False
 
 
+def _fetch_nasa_archive_image(query: str, dest_path: str) -> Optional[str]:
+    """Fetch authentic high-res space/astronomy photograph from NASA open archive."""
+    try:
+        # Simplify query to 2-3 key nouns for optimal archive recall
+        clean_terms = [w for w in re.findall(r"\b[A-Za-z]{3,}\b", query) if w.lower() not in {"dark", "eerie", "shot", "view", "wide", "photograph", "macro"}]
+        search_term = " ".join(clean_terms[:3]) if clean_terms else query
+        url = f"https://images-api.nasa.gov/search?q={requests.utils.quote(search_term)}&media_type=image"
+        resp = requests.get(url, timeout=12)
+        if resp.status_code == 200:
+            items = resp.json().get("collection", {}).get("items", [])
+            for item in items[:4]:
+                links = item.get("links", [])
+                if links and "href" in links[0]:
+                    img_url = links[0]["href"]
+                    # Prefer high-res medium/large if available
+                    img_url_hr = img_url.replace("~thumb.jpg", "~medium.jpg")
+                    img_resp = requests.get(img_url_hr, timeout=15)
+                    if img_resp.status_code != 200 or len(img_resp.content) < 10_000:
+                        img_resp = requests.get(img_url, timeout=15)
+                    if img_resp.status_code == 200 and len(img_resp.content) > 10_000:
+                        with open(dest_path, "wb") as f:
+                            f.write(img_resp.content)
+                        title = item.get("data", [{}])[0].get("title", search_term)
+                        logger.info("Fetched authentic NASA archive photograph: %s", title)
+                        return title
+    except Exception as exc:
+        logger.debug("NASA archive search skipped/failed for '%s': %s", query, exc)
+    return None
+
+
+def _fetch_wikimedia_archive_image(query: str, dest_path: str) -> Optional[str]:
+    """Fetch authentic public-domain historical evidence/photo from Wikimedia Commons."""
+    try:
+        clean_terms = [w for w in re.findall(r"\b[A-Za-z]{3,}\b", query) if w.lower() not in {"dark", "eerie", "shot", "view", "wide", "photograph", "macro"}]
+        search_term = " ".join(clean_terms[:3]) if clean_terms else query
+        url = (
+            f"https://en.wikipedia.org/w/api.php"
+            f"?action=query&format=json&prop=pageimages&pithumbsize=1080"
+            f"&generator=search&gsrsearch={requests.utils.quote(search_term)}&gsrlimit=3"
+        )
+        headers = {"User-Agent": "ShadowVaultInvestigator/1.0 (contact@machine4321.dev)"}
+        resp = requests.get(url, headers=headers, timeout=12)
+        if resp.status_code == 200:
+            pages = resp.json().get("query", {}).get("pages", {})
+            for pid, p in pages.items():
+                thumb = p.get("thumbnail", {}).get("source")
+                if thumb:
+                    img_resp = requests.get(thumb, headers=headers, timeout=15)
+                    if img_resp.status_code == 200 and len(img_resp.content) > 10_000:
+                        with open(dest_path, "wb") as f:
+                            f.write(img_resp.content)
+                        title = p.get("title", search_term)
+                        logger.info("Fetched authentic Wikimedia archive photograph: %s", title)
+                        return title
+    except Exception as exc:
+        logger.debug("Wikimedia archive search skipped/failed for '%s': %s", query, exc)
+    return None
+
+
 def _create_procedural_backdrop(
     scene_id: int,
     dest_path: str,
@@ -292,7 +351,37 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("Radar scope graphic generation failed: %s", exc)
 
-    # 5. Custom 100% Unique AI Visual (Flux)
+    # 5. Authentic Open Archive Photographs (NASA & Wikimedia Commons)
+    if vformat in {"ai_image", "photo", "auto"}:
+        # Check NASA for space/astronomy/planets/probes/signals
+        space_keywords = ["space", "nasa", "probe", "venus", "mars", "telescope", "astronomy", "signal", "planet", "galaxy", "satellite", "orbit", "meteor", "dust", "cosmic"]
+        if any(w in query.lower() or w in text_lower for w in space_keywords):
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_nasa_{random.randint(1000, 9999)}.jpg")
+            nasa_title = _fetch_nasa_archive_image(query, dest)
+            if nasa_title:
+                return {
+                    "scene_id": scene.scene_id,
+                    "path": dest,
+                    "type": "image",
+                    "format": "photo",
+                    "source_desc": f"NASA Official Archive Photograph ('{nasa_title}')",
+                }
+
+        # Check Wikimedia Commons for historical cases/heists/crimes/dossiers
+        history_keywords = ["heist", "fbi", "cia", "vault", "diamond", "robbery", "stole", "investigation", "case", "signal", "wow", "plague", "conspiracy", "secret", "archive"]
+        if any(w in query.lower() or w in text_lower for w in history_keywords):
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_wiki_{random.randint(1000, 9999)}.jpg")
+            wiki_title = _fetch_wikimedia_archive_image(query, dest)
+            if wiki_title:
+                return {
+                    "scene_id": scene.scene_id,
+                    "path": dest,
+                    "type": "image",
+                    "format": "photo",
+                    "source_desc": f"Wikimedia Commons Historical Evidence ('{wiki_title}')",
+                }
+
+    # 6. Custom 100% Unique AI Visual (Flux)
     if vformat in {"ai_image", "auto"}:
         try:
             from shadowvault.image_gen import generate_ai_image
@@ -309,9 +398,8 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("AI image generation call failed: %s", exc)
 
-    # 6. Pexels Stock Video (Atmospheric & Texture Only - strictly no cheesy actors)
+    # 7. High-Resolution Portrait DSLR Photography from Pexels (for Ken Burns smooth motion)
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
-        # Filter out cheesy actor/costume queries to keep documentary realism
         clean_q = re.sub(r"\b(astronaut|actor|man|woman|person|people|posing|costume|walking away|silhouette)\b", "dark atmospheric", query, flags=re.I).strip()
         search_queries = [clean_q]
         words = clean_q.split()
@@ -319,22 +407,7 @@ def fetch_scene_media(
             search_queries.append(" ".join(words[:2]))
         search_queries.append("dark cinematic texture vertical")
 
-        for sq in search_queries:
-            videos = _search_pexels(sq, api_key)
-            if videos:
-                best_link = _pick_best_file(videos[0].get("video_files", []))
-                if best_link:
-                    dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
-                    if _download_video(best_link, dest):
-                        return {
-                            "scene_id": scene.scene_id,
-                            "path": dest,
-                            "type": "video",
-                            "format": "video",
-                            "source_desc": f"Pexels Stock Footage (Query: '{sq}', URL: {best_link[:60]}...)",
-                        }
-
-        # 6. Pexels Photo (portrait high-res for Ken Burns)
+        # Prioritize 4K/8K DSLR photos over stock videos with actors
         for sq in search_queries:
             photos = _search_pexels_photos(sq, api_key)
             if photos:
@@ -350,7 +423,23 @@ def fetch_scene_media(
                             "source_desc": f"Pexels High-Res Photo (Query: '{sq}')",
                         }
 
-    # 7. Procedural cinematic backdrop fallback (only when completely offline or all APIs fail)
+        # 8. Pexels Video (only for atmospheric textures if photo not found)
+        for sq in search_queries:
+            videos = _search_pexels(sq, api_key)
+            if videos:
+                best_link = _pick_best_file(videos[0].get("video_files", []))
+                if best_link:
+                    dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
+                    if _download_video(best_link, dest):
+                        return {
+                            "scene_id": scene.scene_id,
+                            "path": dest,
+                            "type": "video",
+                            "format": "video",
+                            "source_desc": f"Pexels Atmospheric B-Roll (Query: '{sq}', URL: {best_link[:60]}...)",
+                        }
+
+    # 9. Procedural cinematic backdrop fallback (only when completely offline or all APIs fail)
     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
     _create_procedural_backdrop(scene.scene_id, dest)
     return {
