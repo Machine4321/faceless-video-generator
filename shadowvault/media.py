@@ -163,7 +163,15 @@ def _fetch_wikimedia_archive_image(query: str, dest_path: str) -> Optional[str]:
         resp = requests.get(url, headers=headers, timeout=12)
         if resp.status_code == 200:
             pages = resp.json().get("query", {}).get("pages", {})
-            for pid, p in pages.items():
+            # Sort pages strictly by search relevance index
+            sorted_pages = sorted(pages.values(), key=lambda x: x.get("index", 999))
+            for p in sorted_pages:
+                page_title = p.get("title", "").lower()
+                # Ensure the page title is genuinely relevant to the search query
+                if clean_terms:
+                    matches = [term.lower() in page_title for term in clean_terms]
+                    if not any(matches):
+                        continue
                 thumb = p.get("thumbnail", {}).get("source")
                 if thumb:
                     img_resp = requests.get(thumb, headers=headers, timeout=15)

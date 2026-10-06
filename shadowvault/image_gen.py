@@ -37,7 +37,8 @@ def generate_ai_image(
     Generate a 100% unique cinematic portrait image for a scene using Flux.
     Returns True if successfully downloaded and validated, False otherwise.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     clean_prompt = prompt.strip()
     if not clean_prompt:
         clean_prompt = "mysterious cinematic crime documentary scene"
