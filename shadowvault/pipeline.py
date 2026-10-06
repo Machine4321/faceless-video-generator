@@ -15,6 +15,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import sys
 from typing import Optional
 
@@ -94,9 +95,15 @@ async def run_once(
         # Stage 2: Background visual sourcing
         logger.info("[2/5] Sourcing visual media ...")
         if getattr(run.content, "scenes", None) and len(run.content.scenes) > 1:
+            primary = run.content.visual_search_keyword
+            if chosen_topic and isinstance(chosen_topic, str):
+                stop_words = {"the", "a", "an", "that", "this", "these", "those", "and", "or", "in", "on", "at", "to", "for", "of", "with"}
+                topic_words = [w for w in re.sub(r"[^\w\s]", "", chosen_topic).split() if w.lower() not in stop_words]
+                if topic_words:
+                    primary = " ".join(topic_words[:2])
             run.media = media_stage.fetch_multi_scene_media(
                 run.content.scenes,
-                primary_query=run.content.visual_search_keyword,
+                primary_query=primary,
             )
             for sc in getattr(run.media, "scenes_media", []):
                 if sc.get("path"):

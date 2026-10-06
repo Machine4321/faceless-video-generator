@@ -77,34 +77,35 @@ def add_film_grain(img: Image.Image, intensity: float = 7.5) -> Image.Image:
 
 def _composite_sheet_on_desk(
     sheet: Image.Image,
-    desk_color: tuple[int, int, int] = (18, 16, 14),
+    desk_color: tuple[int, int, int] = (24, 20, 18),
     angle: float = -1.8,
     desk_w: int = 1080,
     desk_h: int = 1920,
     center_y: int = 860,
+    warm_spotlight: bool = True,
 ) -> Image.Image:
     """
-    Composite a physical document sheet with soft blurred drop shadow onto a dark desk surface.
-    Gives realistic 3D depth and separation typical of Vox / MagnatesMedia documentaries.
+    Composite a physical document sheet with soft blurred drop shadow onto a rich warm investigation desk surface.
+    Gives realistic 3D depth, soft warm directional lighting, and separation typical of Vox / MagnatesMedia documentaries.
     """
     bg = Image.new("RGB", (desk_w, desk_h), desk_color)
-    bg_draw = ImageDraw.Draw(bg)
 
-    # Subtle vignette / light falloff on desk
-    vignette = Image.new("RGBA", (desk_w, desk_h), (0, 0, 0, 0))
-    v_draw = ImageDraw.Draw(vignette)
-    v_draw.ellipse([80, 200, desk_w - 80, desk_h - 200], fill=(255, 255, 255, 18))
-    vignette = vignette.filter(ImageFilter.GaussianBlur(160))
-    bg.paste(vignette, (0, 0), vignette)
+    # Warm directional desk lamp spotlight
+    if warm_spotlight:
+        spotlight = Image.new("RGBA", (desk_w, desk_h), (0, 0, 0, 0))
+        s_draw = ImageDraw.Draw(spotlight)
+        s_draw.ellipse([100, 240, desk_w - 100, desk_h - 320], fill=(255, 235, 195, 34))
+        spotlight = spotlight.filter(ImageFilter.GaussianBlur(160))
+        bg.paste(spotlight, (0, 0), spotlight)
 
     sw, sh = sheet.size
 
-    # Realistic blurred drop shadow
-    shadow_pad = 60
+    # Multi-layered realistic blurred drop shadow
+    shadow_pad = 70
     shadow = Image.new("RGBA", (sw + shadow_pad * 2, sh + shadow_pad * 2), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(shadow)
-    s_draw.rectangle([shadow_pad, shadow_pad, sw + shadow_pad, sh + shadow_pad], fill=(0, 0, 0, 160))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(28))
+    s_draw.rectangle([shadow_pad, shadow_pad, sw + shadow_pad, sh + shadow_pad], fill=(0, 0, 0, 185))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(32))
 
     # Apply subtle physical angle
     sheet_rot = sheet.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
@@ -114,7 +115,7 @@ def _composite_sheet_on_desk(
     pos_y = center_y - (sheet_rot.height // 2)
 
     # Offset shadow down-right to simulate overhead office desk lighting
-    bg.paste(shadow_rot, (pos_x - 12, pos_y + 18), shadow_rot)
+    bg.paste(shadow_rot, (pos_x - 10, pos_y + 18), shadow_rot)
     bg.paste(sheet_rot, (pos_x, pos_y), sheet_rot)
 
     return bg
@@ -124,24 +125,21 @@ def render_newspaper_frame(
     headline: str,
     snippet: str = "",
     date_str: str = "SPECIAL REPORT",
+    photo_path: Optional[str] = None,
+    caption: str = "",
     dest_path: str = "",
     width: int = 1080,
     height: int = 1920,
 ) -> str:
     """
-    Render a high-impact newspaper clipping resting on an investigation desk
-    with a vibrant fluorescent yellow highlighter marker wipe.
+    Render an authentic, high-impact broadsheet newspaper resting on an investigation desk
+    with an embedded photograph of the subject, realistic typography, and vibrant fluorescent yellow highlighter.
     """
     if dest_path and os.path.dirname(dest_path):
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-    sheet_w, sheet_h = 940, 1540
-    paper_tints = [
-        (244, 239, 230, 255),  # Vintage warm newsprint
-        (240, 236, 226, 255),  # Aged editorial archive
-        (238, 232, 220, 255),  # Sepia dispatch
-    ]
-    paper_color = random.choice(paper_tints)
+    sheet_w, sheet_h = 960, 1540
+    paper_color = (244, 239, 230, 255)  # Vintage warm newsprint
     sheet = Image.new("RGBA", (sheet_w, sheet_h), paper_color)
     draw = ImageDraw.Draw(sheet)
 
@@ -157,24 +155,23 @@ def render_newspaper_frame(
         "INTERNATIONAL HERALD",
         "THE NATIONAL TRIBUNE",
     ]
-    font_masthead = _load_font("serif", size=52, bold=True)
+    font_masthead = _load_font("serif", size=54, bold=True)
     draw.text((sheet_w // 2, 115), random.choice(mastheads), fill=(20, 20, 20), font=font_masthead, anchor="mm")
 
     draw.line([(40, 170), (sheet_w - 40, 170)], fill=(30, 30, 30), width=3)
 
-    # Sub-bar (Date, Edition)
-    font_sub = _load_font("sans", size=22, bold=False)
-    draw.text((sheet_w // 2, 200), f"WORLD EXCLUSIVE • {date_str.upper()} • BREAKING DISPATCH", fill=(75, 75, 75), font=font_sub, anchor="mm")
+    # Sub-bar (Volume, Date, Edition, Price)
+    font_sub = _load_font("sans", size=20, bold=False)
+    draw.text((sheet_w // 2, 200), f"VOL. CXLII No. 48,219 • WORLD EXCLUSIVE • {date_str.upper()} • $1.50", fill=(70, 70, 70), font=font_sub, anchor="mm")
     draw.line([(40, 230), (sheet_w - 40, 230)], fill=(30, 30, 30), width=2)
 
     # Main Headline (All-caps, high-impact)
-    font_hl = _load_font("impact", size=76)
-    wrapped = textwrap.fill(headline.upper(), width=20)
+    font_hl = _load_font("impact", size=72)
+    wrapped = textwrap.fill(headline.upper(), width=22)
     lines = wrapped.split("\n")
 
-    start_y = 280
-    line_h = 88
-    total_hl_h = len(lines) * line_h
+    start_y = 270
+    line_h = 86
 
     # Highlighter wipe layer
     highlighter = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
@@ -183,42 +180,79 @@ def render_newspaper_frame(
     # Highlight the most dramatic line in fluorescent yellow
     hl_line_idx = min(1, len(lines) - 1)
     hl_y = start_y + (hl_line_idx * line_h)
-    h_draw.rectangle([50, hl_y - 8, sheet_w - 50, hl_y + 76], fill=(255, 235, 0, 140))
+    h_draw.rounded_rectangle([45, hl_y + 6, sheet_w - 45, hl_y + 82], radius=6, fill=(255, 236, 0, 155))
     sheet.paste(highlighter, (0, 0), highlighter)
 
     # Draw headline text
     curr_y = start_y
     for line in lines:
-        draw.text((sheet_w // 2, curr_y + 36), line, fill=(15, 15, 15), font=font_hl, anchor="mm")
+        draw.text((sheet_w // 2, curr_y + 44), line, fill=(18, 18, 18), font=font_hl, anchor="mm")
         curr_y += line_h
 
     # Divider below headline
-    draw.line([(40, curr_y + 25), (sheet_w - 40, curr_y + 25)], fill=(30, 30, 30), width=3)
+    draw.line([(40, curr_y + 15), (sheet_w - 40, curr_y + 15)], fill=(30, 30, 30), width=3)
+    curr_y += 35
 
     # Simulated newspaper columns below
-    y_body = curr_y + 55
-    font_body = _load_font("serif", size=24, bold=False)
+    font_body = _load_font("serif", size=21, bold=False)
+    font_cap = _load_font("sans", size=16, bold=False)
 
-    col1_text = (
-        snippet or
-        "Investigative authorities confirmed the unprecedented details early this morning. "
-        "Key witnesses reported irregular activities that completely bypassed conventional detection systems. "
-        "According to confidential sources close to the inquiry, the operation required months of meticulous coordination."
-    )
-    col2_text = (
-        "Independent analysts were left stunned as further documentation surfaced today. "
-        "Questions remain unanswered regarding the true scale of the impact. "
-        "International observers are calling this one of the most remarkable incidents in modern record."
-    )
+    has_photo = photo_path and os.path.isfile(photo_path)
+    if has_photo:
+        try:
+            p_img = Image.open(photo_path).convert("RGB")
+            p_img = p_img.resize((430, 310))
+            sheet.paste(p_img, (55, curr_y))
+            draw.rectangle([55, curr_y, 55 + 430, curr_y + 310], outline=(40, 40, 40), width=2)
+            cap_text = caption or "PHOTO ARCHIVE: Subject documented during record-setting performance."
+            draw.text((55, curr_y + 322), cap_text[:65], fill=(75, 75, 75), font=font_cap)
 
-    draw.multiline_text((60, y_body), textwrap.fill(col1_text, width=24), fill=(45, 45, 45), font=font_body, spacing=8)
-    draw.line([(sheet_w // 2, y_body), (sheet_w // 2, y_body + 380)], fill=(130, 130, 130), width=1)
-    draw.multiline_text((sheet_w // 2 + 25, y_body), textwrap.fill(col2_text, width=24), fill=(45, 45, 45), font=font_body, spacing=8)
+            # Article text beside photo
+            col_text = (
+                snippet or
+                "International observers and independent analysts were left completely stunned as verified documentation surfaced today. "
+                "The documented precision and rhythmic timing completely surpassed existing world standards."
+            )
+            draw.multiline_text((515, curr_y), textwrap.fill(col_text, width=27), fill=(40, 40, 40), font=font_body, spacing=6)
 
-    # Composite physical paper onto dark investigation desk
-    desk_rot = random.uniform(-2.2, -1.2)
-    desk = _composite_sheet_on_desk(sheet, desk_color=(18, 16, 14), angle=desk_rot, center_y=820)
-    desk = add_film_grain(desk, intensity=8.0)
+            # Lower broadsheet text spanning below
+            lower_y = curr_y + 360
+            draw.line([(40, lower_y), (sheet_w - 40, lower_y)], fill=(160, 160, 160), width=1)
+            lower_y += 20
+            col1 = (
+                "Witnesses present at the event confirmed the atmosphere was electric as the performance concluded without a single error. "
+                "Official scorecards were signed by senior committee members within minutes."
+            )
+            col2 = (
+                "Video documentation has circulated through multiple international news outlets. "
+                "Inquiries continue as historians record this moment among the most exceptional documented cases."
+            )
+            draw.multiline_text((55, lower_y), textwrap.fill(col1, width=28), fill=(45, 45, 45), font=font_body, spacing=6)
+            draw.line([(sheet_w // 2, lower_y), (sheet_w // 2, lower_y + 260)], fill=(180, 180, 180), width=1)
+            draw.multiline_text((sheet_w // 2 + 25, lower_y), textwrap.fill(col2, width=28), fill=(45, 45, 45), font=font_body, spacing=6)
+        except Exception as exc:
+            has_photo = False
+
+    if not has_photo:
+        col1_text = (
+            snippet or
+            "Investigative authorities confirmed the unprecedented details early this morning. "
+            "Key witnesses reported irregular activities that completely bypassed conventional detection systems. "
+            "According to confidential sources close to the inquiry, the operation required months of meticulous coordination."
+        )
+        col2_text = (
+            "Independent analysts were left stunned as further documentation surfaced today. "
+            "Questions remain unanswered regarding the true scale of the impact. "
+            "International observers are calling this one of the most remarkable incidents in modern record."
+        )
+        draw.multiline_text((60, curr_y), textwrap.fill(col1_text, width=25), fill=(45, 45, 45), font=font_body, spacing=8)
+        draw.line([(sheet_w // 2, curr_y), (sheet_w // 2, curr_y + 450)], fill=(150, 150, 150), width=1)
+        draw.multiline_text((sheet_w // 2 + 25, curr_y), textwrap.fill(col2_text, width=25), fill=(45, 45, 45), font=font_body, spacing=8)
+
+    # Composite physical paper onto warm investigation desk
+    desk_rot = random.uniform(-2.0, -1.2)
+    desk = _composite_sheet_on_desk(sheet, desk_color=(24, 20, 18), angle=desk_rot, center_y=860, warm_spotlight=True)
+    desk = add_film_grain(desk, intensity=6.5)
     desk.save(dest_path, "JPEG", quality=95)
     return dest_path
 
@@ -526,12 +560,13 @@ def render_animated_counter_video(
     width: int = 1080,
     height: int = 1920,
     theme: Optional[str] = None,
+    bg_image_path: Optional[str] = None,
 ) -> str:
     """
     Render an ultra-smooth animated counting-up motion graphic video.
     The number rapidly rolls/climbs upwards from 0 to the target number
-    over the first 1.35 seconds with cubic ease-out, displaying real rolling digits
-    before locking in with an intense thematic glow.
+    over the first 1.35 seconds with cubic ease-out, displaying real rolling digits,
+    surrounded by pulsating rhythmic audio equalizer bars and set over a rich blurred backdrop.
     """
     if dest_path and os.path.dirname(dest_path):
         os.makedirs(os.path.dirname(dest_path), exist_ok=True)
@@ -547,16 +582,44 @@ def render_animated_counter_video(
             theme = "emerald"
         elif "cosmic" in lbl_lower or "space" in lbl_lower or "distance" in lbl_lower or suffix in {"KM", "LIGHT-YEARS"}:
             theme = "cyan"
+        elif "tempo" in lbl_lower or "salsa" in lbl_lower or "dance" in lbl_lower or suffix == "BPM":
+            theme = "cyan"
         elif "threat" in lbl_lower or "alert" in lbl_lower or "danger" in lbl_lower:
             theme = "crimson"
         else:
             theme = random.choice(["gold", "emerald", "cyan"])
 
-    palette = COUNTER_THEMES.get(theme, COUNTER_THEMES["gold"])
+    palette = COUNTER_THEMES.get(theme, COUNTER_THEMES["cyan"])
 
-    font_lbl = _load_font("sans", size=36, bold=True)
-    font_val = _load_font("impact", size=96)
-    font_sub = _load_font("mono", size=26, bold=False)
+    font_lbl = _load_font("sans", size=32, bold=True)
+    font_val = _load_font("impact", size=108)
+    font_sub = _load_font("mono", size=24, bold=False)
+
+    # 1. Prepare Base Background once (to ensure fast rendering)
+    if bg_image_path and os.path.isfile(bg_image_path):
+        try:
+            base_bg = Image.open(bg_image_path).convert("RGB")
+            # Aspect fill to width x height
+            scale = max(width / base_bg.width, height / base_bg.height)
+            new_w, new_h = int(base_bg.width * scale), int(base_bg.height * scale)
+            base_bg = base_bg.resize((new_w, new_h), Image.Resampling.BICUBIC)
+            x0 = (new_w - width) // 2
+            y0 = (new_h - height) // 2
+            base_bg = base_bg.crop((x0, y0, x0 + width, y0 + height))
+            base_bg = base_bg.filter(ImageFilter.GaussianBlur(34))
+            dim_overlay = Image.new("RGBA", (width, height), (8, 12, 22, 185))
+            base_bg = Image.alpha_composite(base_bg.convert("RGBA"), dim_overlay).convert("RGB")
+        except Exception:
+            base_bg = Image.new("RGB", (width, height), (12, 16, 24))
+    else:
+        base_bg = Image.new("RGB", (width, height), (12, 16, 24))
+
+    # Center ambient colored glow
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(glow)
+    g_draw.ellipse([140, 440, width - 140, 1200], fill=palette["glow"] + (36,))
+    glow = glow.filter(ImageFilter.GaussianBlur(140))
+    base_bg.paste(glow, (0, 0), glow)
 
     writer = imageio.get_writer(
         dest_path,
@@ -566,45 +629,72 @@ def render_animated_counter_video(
         quality=8,
     )
 
+    card_box = [80, 470, width - 80, 1170]
+    bracket_len = 26
+
+    # Equalizer bar geometry
+    num_bars = 21
+    bar_w = 14
+    bar_gap = 12
+    total_eq_w = num_bars * (bar_w + bar_gap) - bar_gap
+    start_eq_x = (width - total_eq_w) // 2
+    eq_y_base = 715
+
     try:
         val_str = ""
+        import math
         for f_idx in range(frames_total):
             if f_idx < anim_frames:
                 tau = f_idx / float(anim_frames)
                 prog = 1.0 - (1.0 - tau) ** 3  # cubic ease-out
                 cur_num = int(target_value * prog)
-                # During animation, display actual rolling digits for maximum kinetic thrill
                 val_str = f"{prefix}{cur_num:,} {suffix}".strip()
             else:
                 cur_num = target_value
                 val_str = f"{prefix}{target_value:,} {suffix}".strip()
 
-            img = Image.new("RGB", (width, height), (12, 14, 20))
+            img = base_bg.copy()
             draw = ImageDraw.Draw(img)
 
-            # Center ambient glow
-            glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
-            g_draw = ImageDraw.Draw(glow)
-            glow_intensity = 42 if f_idx >= anim_frames else 26
-            glow_color = palette["glow"] + (glow_intensity,)
-            g_draw.ellipse([180, 480, width - 180, 1180], fill=glow_color)
-            glow = glow.filter(ImageFilter.GaussianBlur(130))
-            img.paste(glow, (0, 0), glow)
+            # Frosted glass card backdrop
+            card_glass = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            cg_draw = ImageDraw.Draw(card_glass)
+            cg_draw.rounded_rectangle(card_box, radius=26, fill=(10, 16, 26, 225))
+            img.paste(card_glass, (0, 0), card_glass)
 
-            # Tactical card outline (Y: 500 to 1120)
-            draw.rounded_rectangle([90, 500, width - 90, 1120], radius=24, outline=palette["border"], width=3)
-            draw.rounded_rectangle([98, 508, width - 98, 1112], radius=18, outline=palette["inner_border"], width=1)
+            # Double outline
+            draw.rounded_rectangle(card_box, radius=26, outline=palette["border"], width=3)
+            draw.rounded_rectangle([88, 478, width - 88, 1162], radius=18, outline=palette["inner_border"], width=1)
+
+            # Corner tactical brackets (+ / L-markers)
+            draw.line([(80, 470 + bracket_len), (80, 470), (80 + bracket_len, 470)], fill=(255, 255, 255), width=3)
+            draw.line([(width - 80 - bracket_len, 470), (width - 80, 470), (width - 80, 470 + bracket_len)], fill=(255, 255, 255), width=3)
+            draw.line([(80, 1170 - bracket_len), (80, 1170), (80 + bracket_len, 1170)], fill=(255, 255, 255), width=3)
+            draw.line([(width - 80 - bracket_len, 1170), (width - 80, 1170 - bracket_len), (width - 80, 1170)], fill=(255, 255, 255), width=3)
 
             # Category Header Label
-            draw.text((width // 2, 610), stat_label.upper(), fill=palette["label"], font=font_lbl, anchor="mm")
-            draw.line([(width // 2 - 140, 655), (width // 2 + 140, 655)], fill=palette["accent"], width=2)
+            header_text = f"● {stat_label.upper()} ●"
+            draw.text((width // 2, 560), header_text, fill=palette["label"], font=font_lbl, anchor="mm")
+            draw.line([(width // 2 - 160, 600), (width // 2 + 160, 600)], fill=palette["accent"], width=2)
+
+            # Dynamic pulsating rhythmic equalizer bars
+            for b_i in range(num_bars):
+                if f_idx < anim_frames:
+                    # Rapid bouncy pulse while counting
+                    h_bar = int(16 + 36 * abs(math.sin(b_i * 0.45 + f_idx * 0.40)))
+                else:
+                    # Rhythmic smooth pulse once locked
+                    h_bar = int(14 + 20 * abs(math.sin(b_i * 0.40 + f_idx * 0.18)))
+                bx = start_eq_x + b_i * (bar_w + bar_gap)
+                draw.rounded_rectangle([bx, eq_y_base - h_bar, bx + bar_w, eq_y_base + h_bar], radius=6, fill=palette["accent"])
 
             # Animated Rising Number Value (Theme Color)
             num_color = palette["val_done"] if f_idx >= anim_frames else palette["val_anim"]
-            draw.text((width // 2, 795), val_str.upper(), fill=num_color, font=font_val, anchor="mm")
+            draw.text((width // 2, 880), val_str.upper(), fill=num_color, font=font_val, anchor="mm")
 
             # Sub-caption
-            draw.text((width // 2, 975), "OFFICIALLY RECORDED EVIDENCE", fill=(160, 160, 160), font=font_sub, anchor="mm")
+            sub_label = "• OFFICIAL WORLD COMPETITION RECORD •" if suffix in {"BPM", "POINTS"} else "• OFFICIALLY RECORDED EVIDENCE •"
+            draw.text((width // 2, 1050), sub_label, fill=(175, 210, 230), font=font_sub, anchor="mm")
 
             writer.append_data(np.array(img))
     finally:

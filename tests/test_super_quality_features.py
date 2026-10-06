@@ -354,3 +354,68 @@ class TestRadarAndPacingEnhancements:
         assert res.scenes_media[2]["format"] == "counter"
 
 
+class TestSceneSynchronizationAndFraming:
+    def test_compute_scene_durations_with_word_timings(self):
+        from shadowvault.video import _compute_scene_durations
+        from shadowvault.models import WordTiming
+
+        scenes_media = [
+            {"narration": "Meet Bailey the golden retriever dog", "format": "photo"},
+            {"narration": "She started training every single morning", "format": "photo"},
+            {"narration": "Hitting 180 beats per minute", "format": "counter"},
+            {"narration": "Now she performs live worldwide", "format": "newspaper"},
+        ]
+        # Total words: 6 + 6 + 5 + 5 = 22 words
+        # Synthetic word timings spanning 11.0 seconds (0.5s per word)
+        word_timings = []
+        t = 0.0
+        all_words = []
+        for s in scenes_media:
+            all_words.extend(s["narration"].split())
+        for w in all_words:
+            word_timings.append(WordTiming(word=w, start=round(t, 2), end=round(t + 0.45, 2)))
+            t += 0.5
+
+        durations = _compute_scene_durations(scenes_media, word_timings, total_duration=11.0)
+        assert len(durations) == 4
+        assert abs(sum(durations) - 11.0) < 0.01
+        # Scene 1: 6 words -> ~3.0s
+        assert 2.5 <= durations[0] <= 3.5
+        # Scene 3 (counter): starts exactly around scene 1+2 end (~6.0s)
+        scene_3_start = durations[0] + durations[1]
+        assert 5.5 <= scene_3_start <= 6.5
+
+    def test_compute_scene_durations_fallback_word_counts(self):
+        from shadowvault.video import _compute_scene_durations
+
+        scenes_media = [
+            {"narration": "A very short hook"},       # 4 words
+            {"narration": "A much longer second scene with many more words explaining details"},  # 10 words
+        ]
+        durations = _compute_scene_durations(scenes_media, word_timings=None, total_duration=14.0)
+        assert len(durations) == 2
+        assert abs(sum(durations) - 14.0) < 0.01
+        # 4/14 vs 10/14 -> ~4.0s vs 10.0s
+        assert durations[0] < durations[1]
+        assert 3.5 <= durations[0] <= 4.5
+        assert 9.5 <= durations[1] <= 10.5
+
+    def test_newspaper_with_photo_embedding(self, tmp_path):
+        from PIL import Image
+        from shadowvault.graphics import render_newspaper_frame
+
+        photo_path = str(tmp_path / "dog_photo.jpg")
+        Image.new("RGB", (400, 400), (180, 120, 60)).save(photo_path)
+        dest_path = str(tmp_path / "newspaper_out.jpg")
+
+        render_newspaper_frame(
+            headline="SALSA CHAMPION REVEALED",
+            date_str="OCTOBER 2026",
+            dest_path=dest_path,
+            photo_path=photo_path,
+        )
+        assert os.path.isfile(dest_path)
+        assert os.path.getsize(dest_path) > 10000
+
+
+

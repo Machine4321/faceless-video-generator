@@ -490,7 +490,10 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
 
     title = clean_text(data["title"])
     script = clean_text(data["script"])
-    visual_search = clean_text(data["visual_search"]).split()[0]
+    raw_kw = clean_text(data["visual_search"])
+    stop_words = {"the", "a", "an", "this", "that", "these", "those", "is", "are", "was", "were", "of", "in", "on", "at", "to", "for", "with", "by", "from"}
+    candidate_words = [w for w in re.sub(r"[^\w\s]", "", raw_kw).split() if w.lower() not in stop_words]
+    visual_search = candidate_words[0] if candidate_words else (raw_kw.split()[0] if raw_kw.split() else "viral")
     tags = clean_text(data["tags"])
 
     # Parse multi-scene plan if provided by model

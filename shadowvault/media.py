@@ -263,7 +263,8 @@ def _extract_clean_search_terms(query: str, narration: str = "") -> list[str]:
         queries.append(n_words[0])
 
     if not queries:
-        queries = [query]
+        clean_fallback = [w for w in re.findall(r"\b[A-Za-z0-9'-]+\b", query) if w.lower() not in {"the", "a", "an", "this", "that"}]
+        queries = [clean_fallback[0]] if clean_fallback else ["viral subject"]
     return queries
 
 
@@ -275,6 +276,7 @@ def fetch_scene_media(
     scene: ScenePlan,
     temp_dir: str,
     api_key: str | None = None,
+    context_image_path: str | None = None,
 ) -> dict:
     """
     Fetch best media (documentary graphic, AI image, Pexels video, or photo) for a scene.
@@ -299,6 +301,8 @@ def fetch_scene_media(
             "path": dest,
             "type": "image",
             "format": "procedural",
+            "visual_format": "procedural",
+            "narration": scene.narration,
             "source_desc": "Procedural Dark Cinema Backdrop (Pillow)",
         }
 
@@ -328,19 +332,21 @@ def fetch_scene_media(
         if not any(w in query.lower() or w in text_lower for w in radar_keywords):
             vformat = "ai_image"
 
-    # 1. Documentary Evidence Graphic: Newspaper Clipping (with highlighter effect)
+    # 1. Documentary Evidence Graphic: Newspaper Clipping (with embedded subject photo & highlighter effect)
     if vformat == "newspaper":
         try:
             from shadowvault.graphics import render_newspaper_frame
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_news_{random.randint(1000, 9999)}.jpg")
-            render_newspaper_frame(headline=scene.narration, dest_path=dest)
-            logger.info("Generated Vox-style newspaper graphic for scene %d", scene.scene_id)
+            render_newspaper_frame(headline=scene.narration, photo_path=context_image_path, dest_path=dest)
+            logger.info("Generated Vox-style broadsheet newspaper graphic for scene %d (photo=%s)", scene.scene_id, bool(context_image_path))
             return {
                 "scene_id": scene.scene_id,
                 "path": dest,
                 "type": "image",
                 "format": "newspaper",
-                "source_desc": f"Procedural Archival Newspaper (Pillow 3D Desk, Headline: '{scene.narration[:60]}...')",
+                "visual_format": "newspaper",
+                "narration": scene.narration,
+                "source_desc": f"Procedural Archival Broadsheet (Pillow 3D Desk, Headline: '{scene.narration[:60]}...')",
             }
         except Exception as exc:
             logger.warning("Newspaper graphic generation failed: %s", exc)
@@ -357,12 +363,14 @@ def fetch_scene_media(
                 "path": dest,
                 "type": "image",
                 "format": "dossier",
+                "visual_format": "dossier",
+                "narration": scene.narration,
                 "source_desc": f"Procedural Classified Dossier (Pillow 3D Desk, Stamp: TOP SECRET, Query: '{scene.visual_query}')",
             }
         except Exception as exc:
             logger.warning("Classified dossier generation failed: %s", exc)
 
-    # 3. Documentary Graphic: Animated Stat Counter Video (Rising Number Ticker)
+    # 3. Documentary Graphic: Animated Stat Counter Video (Rising Number Ticker with Blurred Backdrop & EQ)
     if vformat == "counter":
         try:
             from shadowvault.graphics import parse_stat_from_narration, render_animated_counter_video
@@ -376,14 +384,17 @@ def fetch_scene_media(
                 stat_label=label,
                 dest_path=dest,
                 duration=dur,
+                bg_image_path=context_image_path,
             )
             val_str = f"{prefix}{target_val:,} {suffix}".strip()
-            logger.info("Generated animated stat counter video for scene %d (%s: %s)", scene.scene_id, label, val_str)
+            logger.info("Generated animated stat counter video for scene %d (%s: %s | bg=%s)", scene.scene_id, label, val_str, bool(context_image_path))
             return {
                 "scene_id": scene.scene_id,
                 "path": dest,
                 "type": "video",
                 "format": "counter",
+                "visual_format": "counter",
+                "narration": scene.narration,
                 "source_desc": f"Animated Stat Counter Video (Pillow/FFmpeg, Value: {val_str}, Label: '{label}')",
             }
         except Exception as exc:
@@ -544,7 +555,12 @@ def fetch_multi_scene_media(
 
     # Offline / Mock test mode
     if not api_key or api_key == "fake-key" or api_key.startswith("test"):
-        scenes_media = [fetch_scene_media(sc, temp_dir, api_key=api_key) for sc in scenes]
+        scenes_media = []
+        for sc in scenes:
+            it = fetch_scene_media(sc, temp_dir, api_key=api_key)
+            it["narration"] = sc.narration
+            it["visual_format"] = getattr(sc, "visual_format", "auto")
+            scenes_media.append(it)
         return MediaResult(
             video_path=scenes_media[0]["path"] if scenes_media else "",
             source_url="multi_scene_offline",
@@ -565,7 +581,8 @@ def fetch_multi_scene_media(
         "jack russell terrier", "jack russell", "golden retriever", "dalmatian", "german shepherd",
         "border collie", "corgi", "poodle", "husky", "chihuahua", "french bulldog", "labrador",
         "beagle", "rottweiler", "pitbull", "boxer", "dachshund", "shiba inu", "pug",
-        "tabby cat", "persian cat", "siamese cat", "black cat",
+        "dog dancing", "dancing dog", "salsa dog", "dog", "puppy", "dogs",
+        "tabby cat", "persian cat", "siamese cat", "black cat", "cat", "kitten",
         "formula 1 car", "supercar", "sports car", "fighter jet", "space shuttle"
     ]
     all_text = " ".join([primary_query or ""] + [f"{sc.visual_query} {sc.narration}" for sc in scenes]).lower()
@@ -573,15 +590,17 @@ def fetch_multi_scene_media(
         if ds in all_text and ds not in candidates:
             candidates.append(ds)
 
-    # Priority B: Primary query clean terms
+    # Priority B: Primary query clean terms (strip stopwords)
     if primary_query:
-        candidates.extend(_extract_clean_search_terms(primary_query))
+        for t in _extract_clean_search_terms(primary_query):
+            if t.lower() not in {"the", "a", "an", "viral subject"} and t not in candidates:
+                candidates.append(t)
 
     # Priority C: Clean terms from character/visual scenes
     for sc in scenes:
         if sc.visual_format in {"ai_image", "photo", "video", "auto"} and sc.visual_query:
             for term in _extract_clean_search_terms(sc.visual_query, sc.narration):
-                if term not in candidates:
+                if term.lower() not in {"the", "a", "an", "viral subject"} and term not in candidates:
                     candidates.append(term)
 
     # Search Pexels to locate a photographer with a multi-shot series
@@ -607,6 +626,7 @@ def fetch_multi_scene_media(
     scenes_media: list[dict] = []
     series_idx = 0
     primary_path = ""
+    last_character_photo: str | None = None
 
     for scene in scenes:
         vformat = getattr(scene, "visual_format", "auto")
@@ -623,7 +643,9 @@ def fetch_multi_scene_media(
 
         # Documentary graphics take precedence for their specific purpose
         if vformat in {"newspaper", "dossier", "counter", "radar"}:
-            item = fetch_scene_media(scene, temp_dir, api_key=api_key)
+            item = fetch_scene_media(scene, temp_dir, api_key=api_key, context_image_path=last_character_photo)
+            item["narration"] = scene.narration
+            item["visual_format"] = vformat
             scenes_media.append(item)
             if not primary_path:
                 primary_path = item["path"]
@@ -638,6 +660,7 @@ def fetch_multi_scene_media(
                 dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_series_{photo.get('id')}.jpg")
                 if _download_video(photo_url, dest):
                     series_idx += 1
+                    last_character_photo = dest
                     alt_desc = (photo.get("alt") or "").strip()
                     logger.info("Scene %d assigned from Character Series (%s - Photo %d)", scene.scene_id, anchor_photographer, series_idx)
                     scenes_media.append({
@@ -645,6 +668,8 @@ def fetch_multi_scene_media(
                         "path": dest,
                         "type": "image",
                         "format": "photo",
+                        "visual_format": "photo",
+                        "narration": scene.narration,
                         "source_desc": f"Pexels Character Series ({anchor_photographer}, Subject: '{anchor_query}', Alt: '{alt_desc[:50]}')",
                     })
                     used_series_item = True
@@ -653,7 +678,9 @@ def fetch_multi_scene_media(
 
         if not used_series_item:
             # Fall back to standard scene-specific search
-            item = fetch_scene_media(scene, temp_dir, api_key=api_key)
+            item = fetch_scene_media(scene, temp_dir, api_key=api_key, context_image_path=last_character_photo)
+            item["narration"] = scene.narration
+            item["visual_format"] = getattr(scene, "visual_format", "auto")
             scenes_media.append(item)
             if not primary_path:
                 primary_path = item["path"]

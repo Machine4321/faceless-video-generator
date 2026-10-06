@@ -490,22 +490,86 @@ def _create_ken_burns_clip(
     return final_clip
 
 
+def _compute_scene_durations(
+    scenes_media: list[dict],
+    word_timings: list[Any] | None,
+    total_duration: float,
+) -> list[float]:
+    """
+    Compute frame-perfect scene durations matching the exact spoken narration.
+    Uses audio.word_timings when available, with word-count proportionality fallback.
+    Guarantees sum(durations) == total_duration with zero drift.
+    """
+    n_scenes = len(scenes_media)
+    if n_scenes <= 1:
+        return [total_duration]
+
+    durations: list[float] = []
+
+    # Strategy 1: Match scene narration against actual Edge-TTS word timings
+    if word_timings and len(word_timings) >= n_scenes:
+        prev_boundary = 0.0
+        wt_idx = 0
+        total_wt = len(word_timings)
+
+        for s_idx, sc in enumerate(scenes_media):
+            narration = sc.get("narration", "")
+            words = [w for w in narration.split() if w.strip()]
+            word_count = len(words) or 5
+
+            end_wt_idx = min(total_wt - 1, wt_idx + word_count - 1)
+            if s_idx == n_scenes - 1:
+                boundary = total_duration
+            else:
+                if end_wt_idx + 1 < total_wt:
+                    boundary = (word_timings[end_wt_idx].end + word_timings[end_wt_idx + 1].start) / 2.0
+                else:
+                    boundary = word_timings[end_wt_idx].end
+                wt_idx = end_wt_idx + 1
+
+            dur = max(1.2, boundary - prev_boundary)
+            durations.append(dur)
+            prev_boundary = boundary
+
+        s_dur = sum(durations)
+        if s_dur > 0:
+            scale = total_duration / s_dur
+            durations = [round(d * scale, 3) for d in durations]
+            durations[-1] += round(total_duration - sum(durations), 3)
+            return durations
+
+    # Strategy 2: Proportional to word count per scene
+    word_counts = []
+    for sc in scenes_media:
+        words = sc.get("narration", "").split()
+        word_counts.append(max(1, len(words)))
+
+    total_words = sum(word_counts)
+    durations = [max(1.2, (c / total_words) * total_duration) for c in word_counts]
+    scale = total_duration / sum(durations)
+    durations = [round(d * scale, 3) for d in durations]
+    durations[-1] += round(total_duration - sum(durations), 3)
+    return durations
+
+
 def _build_multi_scene_background(
     scenes_media: list[dict],
     total_duration: float,
     output_width: int,
     output_height: int,
+    word_timings: list[Any] | None = None,
 ) -> VideoFileClip | ImageClip | CompositeVideoClip:
     """
-    Assemble multiple sequential scene clips (video or Ken-Burns photos).
+    Assemble multiple sequential scene clips with frame-perfect narration synchronization.
     """
     if not scenes_media:
         return ColorClip((output_width, output_height), col=(15, 17, 24)).set_duration(total_duration)
 
-    scene_dur = total_duration / len(scenes_media)
+    scene_durations = _compute_scene_durations(scenes_media, word_timings, total_duration)
     clips = []
 
     for idx, item in enumerate(scenes_media):
+        scene_dur = scene_durations[idx]
         path = item.get("path", "")
         media_type = item.get("type", "video")
 
@@ -627,6 +691,7 @@ def _mix_audio_advanced(
     enable_sfx: bool = True,
     scenes_media: list[dict] | None = None,
     mood_context: str = "",
+    word_timings: list[Any] | None = None,
 ) -> CompositeAudioClip | AudioFileClip:
     """
     Advanced sound designer:
@@ -663,11 +728,11 @@ def _mix_audio_advanced(
                 audio_tracks.append(impact_clip)
 
             if scenes_media:
-                n_scenes = len(scenes_media)
-                scene_dur = total_duration / max(1, n_scenes)
+                scene_durations = _compute_scene_durations(scenes_media, word_timings, total_duration)
                 curr_t = 0.0
                 for idx, sc in enumerate(scenes_media):
                     s_fmt = sc.get("format", "")
+                    scene_dur = scene_durations[idx]
                     # Paper slide when physical documents appear
                     if s_fmt in {"dossier", "newspaper"} and "paper_slide" in sfx_map and os.path.isfile(sfx_map["paper_slide"]):
                         ps = AudioFileClip(sfx_map["paper_slide"]).volumex(0.32).set_start(curr_t + 0.05)
@@ -784,6 +849,7 @@ def compose_video(
             total_duration=total_duration,
             output_width=output_width,
             output_height=output_height,
+            word_timings=getattr(audio, "word_timings", None),
         )
     elif media.video_path and os.path.isfile(media.video_path):
         logger.info("Loading single background video: %s", media.video_path)
@@ -821,6 +887,7 @@ def compose_video(
         enable_sfx=enable_sfx,
         scenes_media=getattr(media, "scenes_media", None),
         mood_context=f"{title} {script[:200]}",
+        word_timings=getattr(audio, "word_timings", None),
     )
     bg = bg.set_audio(final_audio)
 
