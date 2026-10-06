@@ -235,24 +235,45 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("Classified dossier generation failed: %s", exc)
 
-    # 3. Documentary Graphic: Stat / Counter Card
+    # 3. Documentary Graphic: Animated Stat Counter Video (Rising Number Ticker)
     if vformat == "counter":
         try:
-            from shadowvault.graphics import render_stat_counter_card
-            m = re.search(r"(\$[\d,]+(?:\.\d+)?|\b\d+[\d,]*\s*(?:million|billion|thousand)?\b)", scene.narration, re.IGNORECASE)
-            stat_val = m.group(0) if m else "$100M"
-            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.jpg")
-            render_stat_counter_card(stat_value=stat_val, stat_label="DOCUMENTED RECORD", dest_path=dest)
-            logger.info("Generated stat counter card for scene %d (%s)", scene.scene_id, stat_val)
+            from shadowvault.graphics import parse_stat_from_narration, render_animated_counter_video
+            target_val, prefix, suffix, label = parse_stat_from_narration(scene.narration)
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.mp4")
+            dur = max(getattr(scene, "duration", 0.0) or 4.0, 5.0)
+            render_animated_counter_video(
+                target_value=target_val,
+                prefix=prefix,
+                suffix=suffix,
+                stat_label=label,
+                dest_path=dest,
+                duration=dur,
+            )
+            val_str = f"{prefix}{target_val:,} {suffix}".strip()
+            logger.info("Generated animated stat counter video for scene %d (%s: %s)", scene.scene_id, label, val_str)
             return {
                 "scene_id": scene.scene_id,
                 "path": dest,
-                "type": "image",
+                "type": "video",
                 "format": "counter",
-                "source_desc": f"Procedural Document Stat Card (Pillow 3D Desk, Value: {stat_val})",
+                "source_desc": f"Animated Stat Counter Video (Pillow/FFmpeg, Value: {val_str}, Label: '{label}')",
             }
         except Exception as exc:
-            logger.warning("Stat counter generation failed: %s", exc)
+            logger.warning("Animated stat counter video generation failed: %s", exc)
+            try:
+                from shadowvault.graphics import render_stat_counter_card
+                dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.jpg")
+                render_stat_counter_card(stat_value=val_str if "val_str" in locals() else "$100M", stat_label=label if "label" in locals() else "DOCUMENTED RECORD", dest_path=dest)
+                return {
+                    "scene_id": scene.scene_id,
+                    "path": dest,
+                    "type": "image",
+                    "format": "counter",
+                    "source_desc": f"Static Stat Card Fallback (Value: {val_str if 'val_str' in locals() else '$100M'})",
+                }
+            except Exception:
+                pass
 
     # 4. Custom 100% Unique AI Visual (Flux)
     if vformat in {"ai_image", "auto"}:

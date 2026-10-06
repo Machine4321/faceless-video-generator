@@ -86,3 +86,51 @@ def test_procedural_foley_sfx(tmp_path):
         assert os.path.isfile(sfx_map[name])
         assert os.path.getsize(sfx_map[name]) > 500
 
+
+def test_parse_stat_from_narration():
+    from shadowvault.graphics import parse_stat_from_narration
+
+    # 1. Word number with tons
+    num, pre, suf, lbl = parse_stat_from_narration(
+        "Instead, eighty-four thousand tons of space debris vaporize there annually."
+    )
+    assert num == 84000
+    assert pre == ""
+    assert suf == "TONS"
+    assert "DEBRIS" in lbl
+
+    # 2. Word number with dollars
+    num, pre, suf, lbl = parse_stat_from_narration(
+        "Thieves stole one hundred million dollars in diamonds."
+    )
+    assert num == 100000000
+    assert pre == "$"
+    assert "VALUATION" in lbl or "FINANCIAL" in lbl
+
+    # 3. Hours duration
+    num, pre, suf, lbl = parse_stat_from_narration(
+        "The signal lasted for seven hours without interruption."
+    )
+    assert num == 7
+    assert suf == "HOURS"
+    assert "DURATION" in lbl
+
+
+def test_render_animated_counter_video(tmp_path):
+    from shadowvault.graphics import render_animated_counter_video
+
+    dest = str(tmp_path / "test_counter.mp4")
+    out = render_animated_counter_video(
+        target_value=84000,
+        prefix="",
+        suffix="TONS",
+        stat_label="ANNUAL SPACE DEBRIS",
+        dest_path=dest,
+        duration=1.5,
+        fps=15,
+        width=360,
+        height=640,
+    )
+    assert os.path.isfile(out)
+    assert os.path.getsize(out) > 1000
+

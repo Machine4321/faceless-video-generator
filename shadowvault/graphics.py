@@ -14,9 +14,11 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 import textwrap
 from typing import Optional
 
+import imageio
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
@@ -279,6 +281,215 @@ def render_classified_dossier(
     return dest_path
 
 
+WORD_TO_NUM = {
+    "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10,
+    "eleven": 11, "twelve": 12, "thirteen": 13, "fourteen": 14,
+    "fifteen": 15, "sixteen": 16, "seventeen": 17, "eighteen": 18,
+    "nineteen": 19, "twenty": 20, "thirty": 30, "forty": 40,
+    "fifty": 50, "sixty": 60, "seventy": 70, "eighty": 80, "ninety": 90,
+}
+
+SCALES = {
+    "hundred": 100,
+    "thousand": 1_000,
+    "million": 1_000_000,
+    "billion": 1_000_000_000,
+    "trillion": 1_000_000_000_000,
+}
+
+UNITS_KEYWORDS = {
+    "ton": "TONS", "tons": "TONS",
+    "dollar": "$", "dollars": "$",
+    "hour": "HOURS", "hours": "HOURS",
+    "second": "SECONDS", "seconds": "SECONDS",
+    "minute": "MINUTES", "minutes": "MINUTES",
+    "day": "DAYS", "days": "DAYS",
+    "year": "YEARS", "years": "YEARS",
+    "mile": "MILES", "miles": "MILES",
+    "light-year": "LIGHT-YEARS", "light-years": "LIGHT-YEARS",
+    "lightyear": "LIGHT-YEARS", "lightyears": "LIGHT-YEARS",
+    "can": "CANS", "cans": "CANS",
+    "layer": "LAYERS", "layers": "LAYERS",
+    "percent": "%",
+}
+
+
+def parse_stat_from_narration(narration: str) -> tuple[int, str, str, str]:
+    """
+    Intelligently extract the primary numerical stat, prefix, suffix, and contextual label
+    from narration text, supporting both word numbers ("eighty-four thousand tons")
+    and digits ("$100M", "84,000", "72 seconds").
+
+    Returns: (target_value, prefix, suffix, contextual_label)
+    """
+    clean = re.sub(r"(\w+)-(\w+)", r"\1 \2", narration.lower())
+
+    # Detect unit across the sentence
+    detected_unit = ""
+    for w, u in UNITS_KEYWORDS.items():
+        if re.search(r"\b" + re.escape(w) + r"\b", clean):
+            detected_unit = u
+            break
+
+    # 1. First check explicit digit patterns e.g. $100M, 84,000 tons, 10 layers
+    m_dig = re.search(
+        r"(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*\b(k|m|b|million|billion|thousand)\b)?",
+        clean,
+    )
+    if m_dig:
+        prefix = "$" if (m_dig.group(1) or detected_unit == "$" or "dollar" in clean) else ""
+        raw_num = float(m_dig.group(2).replace(",", ""))
+        scale_str = (m_dig.group(3) or "").lower()
+        if scale_str in {"k", "thousand"}:
+            num = int(raw_num * 1_000)
+        elif scale_str in {"m", "million"}:
+            num = int(raw_num * 1_000_000)
+        elif scale_str in {"b", "billion"}:
+            num = int(raw_num * 1_000_000_000)
+        else:
+            num = int(raw_num)
+        suffix = detected_unit if detected_unit != "$" else ""
+        return _categorize_stat(num, prefix, suffix, narration)
+
+    # 2. Parse English written words (e.g. "eighty-four thousand", "one hundred million")
+    words = re.findall(r"\b[a-z\-]+\b", clean)
+    total = 0
+    current = 0
+    found_any = False
+
+    for w in words:
+        if w in WORD_TO_NUM:
+            current += WORD_TO_NUM[w]
+            found_any = True
+        elif w in SCALES:
+            scale = SCALES[w]
+            current = (current if current != 0 else 1) * scale
+            if scale >= 1000:
+                total += current
+                current = 0
+            found_any = True
+        else:
+            if found_any:
+                break
+
+    total += current
+    if found_any and total > 0:
+        prefix = "$" if (detected_unit == "$" or "dollar" in clean) else ""
+        suffix = detected_unit if detected_unit != "$" else ""
+        return _categorize_stat(total, prefix, suffix, narration)
+
+    # 3. Fallback default
+    return (100_000_000, "$", "", "DOCUMENTED RECORD")
+
+
+def _categorize_stat(num: int, prefix: str, suffix: str, text: str) -> tuple[int, str, str, str]:
+    """Determine high-impact contextual label based on metric and subject."""
+    text_l = text.lower()
+    if "debris" in text_l or "dust" in text_l or suffix == "TONS":
+        label = "ANNUAL SPACE DEBRIS"
+    elif "layer" in text_l or suffix == "LAYERS":
+        label = "VAULT SECURITY PROTOCOLS"
+    elif "stolen" in text_l or "heist" in text_l:
+        label = "STOLEN VALUATION"
+    elif "dollar" in text_l or prefix == "$":
+        label = "FINANCIAL RECORD"
+    elif "signal" in text_l or suffix in {"HOURS", "SECONDS", "MINUTES"}:
+        label = "RECORDED DURATION"
+    elif "distance" in text_l or suffix == "LIGHT-YEARS":
+        label = "COSMIC DISTANCE"
+    elif "can" in text_l:
+        label = "ANNUAL SALES VOLUME"
+    elif "year" in text_l or suffix == "YEARS":
+        label = "HISTORICAL TIMELINE"
+    else:
+        label = "DOCUMENTED RECORD"
+    return (num, prefix, suffix, label)
+
+
+def render_animated_counter_video(
+    target_value: int,
+    prefix: str = "",
+    suffix: str = "",
+    stat_label: str = "DOCUMENTED RECORD",
+    dest_path: str = "",
+    duration: float = 4.0,
+    fps: int = 30,
+    width: int = 1080,
+    height: int = 1920,
+) -> str:
+    """
+    Render an ultra-smooth animated counting-up motion graphic video.
+    The number rapidly rolls/climbs upwards from 0 to the target number
+    over the first 1.35 seconds with cubic ease-out, then locks in with a gold glow.
+    """
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    frames_total = max(1, int(fps * duration))
+    anim_frames = min(frames_total, max(1, int(fps * 1.35)))
+
+    font_lbl = _load_font("sans", size=36, bold=True)
+    font_val = _load_font("impact", size=96)
+    font_sub = _load_font("mono", size=26, bold=False)
+
+    writer = imageio.get_writer(
+        dest_path,
+        fps=fps,
+        codec="libx264",
+        macro_block_size=1,
+        quality=8,
+    )
+
+    try:
+        val_str = ""
+        for f_idx in range(frames_total):
+            if f_idx < anim_frames:
+                tau = f_idx / float(anim_frames)
+                prog = 1.0 - (1.0 - tau) ** 3  # cubic ease-out
+                cur_num = int(target_value * prog)
+            else:
+                cur_num = target_value
+
+            if target_value >= 1_000_000_000 and target_value % 1_000_000_000 == 0:
+                val_str = f"{prefix}{cur_num // 1_000_000_000}B {suffix}".strip()
+            elif target_value >= 1_000_000 and target_value % 1_000_000 == 0:
+                val_str = f"{prefix}{cur_num // 1_000_000}M {suffix}".strip()
+            else:
+                val_str = f"{prefix}{cur_num:,} {suffix}".strip()
+
+            img = Image.new("RGB", (width, height), (12, 14, 20))
+            draw = ImageDraw.Draw(img)
+
+            # Center ambient gold glow
+            glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            g_draw = ImageDraw.Draw(glow)
+            glow_intensity = 35 if f_idx >= anim_frames else 22
+            g_draw.ellipse([180, 480, width - 180, 1180], fill=(255, 215, 0, glow_intensity))
+            glow = glow.filter(ImageFilter.GaussianBlur(130))
+            img.paste(glow, (0, 0), glow)
+
+            # Golden tactical card outline (Y: 500 to 1120)
+            draw.rounded_rectangle([90, 500, width - 90, 1120], radius=24, outline=(255, 215, 0, 180), width=3)
+            draw.rounded_rectangle([98, 508, width - 98, 1112], radius=18, outline=(255, 215, 0, 60), width=1)
+
+            # Category Header Label
+            draw.text((width // 2, 610), stat_label.upper(), fill=(200, 200, 200), font=font_lbl, anchor="mm")
+            draw.line([(width // 2 - 140, 655), (width // 2 + 140, 655)], fill=(255, 215, 0, 140), width=2)
+
+            # Animated Rising Number Value (Glowing Gold)
+            num_color = (255, 235, 30) if f_idx >= anim_frames else (255, 215, 0)
+            draw.text((width // 2, 795), val_str.upper(), fill=num_color, font=font_val, anchor="mm")
+
+            # Sub-caption
+            draw.text((width // 2, 975), "OFFICIALLY RECORDED EVIDENCE", fill=(160, 160, 160), font=font_sub, anchor="mm")
+
+            writer.append_data(np.array(img))
+    finally:
+        writer.close()
+
+    logger.info("Rendered animated counter video -> %s (%s: %s)", dest_path, stat_label, val_str)
+    return dest_path
+
+
 def render_stat_counter_card(
     stat_value: str,
     stat_label: str,
@@ -287,7 +498,7 @@ def render_stat_counter_card(
     height: int = 1920,
 ) -> str:
     """
-    Render a high-tech glowing stat card (e.g. '$100,000,000' or '727,000').
+    Render a high-tech glowing static stat card (fallback).
     Positioned in upper-middle area to prevent subtitle collision.
     """
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
