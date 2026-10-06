@@ -42,23 +42,22 @@ USER_AGENT = (
 
 # Niche classification heuristics
 KEYWORD_NICHE_MAP = {
-    "heists": ["heist", "stolen", "thief", "robbery", "scam", "fraud", "vault", "million", "billion", "crypto", "hack"],
-    "glitches": ["glitch", "anomaly", "unexplained", "phenomenon", "strange", "bizarre", "island", "illusion", "mystery"],
-    "business": ["market", "stock", "ceo", "apple", "google", "microsoft", "amazon", "nvidia", "tesla", "startup", "company", "bank"],
-    "dark_psychology": ["brain", "psychology", "mind", "lie", "fbi", "interrogation", "memory", "subconscious", "behavior"],
-    "horror": ["death", "dead", "murder", "killer", "creepy", "ghost", "dark", "abandoned", "curse", "cemetery"],
+    "heists": ["heist", "stolen", "thief", "robbery", "scam", "fraud", "vault", "million", "billion", "crypto", "hack", "smuggling", "cartel"],
+    "glitches": ["glitch", "anomaly", "unexplained", "phenomenon", "strange", "bizarre", "island", "illusion", "mystery", "signal", "alien", "ufo", "uap", "bermuda"],
+    "business": ["market", "stock", "ceo", "apple", "google", "microsoft", "amazon", "nvidia", "tesla", "startup", "company", "bank", "billionaire"],
+    "dark_psychology": ["brain", "psychology", "mind", "lie", "fbi", "cia", "interrogation", "memory", "subconscious", "behavior", "conspiracy", "secret", "classified", "senate", "leak", "buried", "pentagon"],
+    "horror": ["death", "dead", "murder", "killer", "creepy", "ghost", "dark", "abandoned", "curse", "cemetery", "haunted", "grave", "cult", "nightmare"],
     "facts": ["exoplanet", "space", "telescope", "nasa", "discovery", "scientists", "planet", "galaxy", "ocean", "dna", "quantum", "physics"],
 }
 
+# Irrelevant superficial topics to filter out for Shadow Vault's serious investigative brand
+BANNED_TOPIC_KEYWORDS = {
+    " vs ", "vs.", "score", "game", "nba", "nfl", "mlb", "nhl", "premier league",
+    "quarterback", "touchdown", "celebrity", "red carpet", "actor", "actress",
+    "box office", "season finale", "real housewives", "bachelor", "sports", "coach",
+}
+
 EVERGREEN_FALLBACK_TRENDS: list[TrendingTopic] = [
-    TrendingTopic(
-        title="Astronomers Confirm Discovery of the Youngest Known Exoplanet Ever",
-        summary="Deep in the cosmos, astronomers using high-resolution spectroscopy detected a newborn world orbiting a star only a few million years old, challenging all models of planetary formation.",
-        source="google_trends",
-        search_volume="500K+",
-        suggested_niche="facts",
-        keywords=["exoplanet", "astronomy", "space discovery", "cosmos"],
-    ),
     TrendingTopic(
         title="The Antwerp Diamond Heist Solved by a Half-Eaten Sandwich",
         summary="Thieves broke through ten layers of impenetrable biometric vault security to steal $100M in diamonds, only to be caught because an accomplice left his lunch on a roadside curb.",
@@ -68,12 +67,44 @@ EVERGREEN_FALLBACK_TRENDS: list[TrendingTopic] = [
         keywords=["diamond heist", "antwerp vault", "impossible crime"],
     ),
     TrendingTopic(
+        title="The 1977 Wow! Signal That Came From Deep Uncharted Space",
+        summary="For 72 seconds, the Big Ear radio telescope detected a powerful narrowband radio signal from Sagittarius that matched no known natural source, remaining completely unexplained to this day.",
+        source="editorial",
+        search_volume="500K+",
+        suggested_niche="glitches",
+        keywords=["wow signal", "deep space", "unexplained frequency"],
+    ),
+    TrendingTopic(
+        title="Operation Midnight Climax: The CIA Secret Safehouses",
+        summary="Declassified CIA files revealed government safehouses in San Francisco where unsuspecting citizens were secretly dosed with experimental compounds behind two-way mirrors.",
+        source="editorial",
+        search_volume="750K+",
+        suggested_niche="dark_psychology",
+        keywords=["cia declassified", "mk ultra", "secret safehouse"],
+    ),
+    TrendingTopic(
         title="The 1518 Dancing Plague That Baffled Doctors for Centuries",
         summary="Hundreds of citizens in Strasbourg danced uncontrollably for weeks without rest or explanation, collapsing and dying in the streets while onlookers watched in horror.",
         source="wikipedia",
         search_volume="250K+",
-        suggested_niche="glitches",
+        suggested_niche="horror",
         keywords=["dancing plague", "historical mystery", "unexplained phenomenon"],
+    ),
+    TrendingTopic(
+        title="The Central Bank of Iraq Heist: $1 Billion Taken in Cash",
+        summary="Hours before bombs fell over Baghdad, three tractor-trailers pulled up to the Central Bank of Iraq to haul away nearly one billion dollars in physical cash that never resurfaced.",
+        source="editorial",
+        search_volume="1M+",
+        suggested_niche="heists",
+        keywords=["iraq bank heist", "billion dollar cash", "untold mystery"],
+    ),
+    TrendingTopic(
+        title="Astronomers Confirm Discovery of the Youngest Known Exoplanet Ever",
+        summary="Deep in the cosmos, astronomers using high-resolution spectroscopy detected a newborn world orbiting a star only a few million years old, challenging all models of planetary formation.",
+        source="google_trends",
+        search_volume="500K+",
+        suggested_niche="facts",
+        keywords=["exoplanet", "astronomy", "space discovery", "cosmos"],
     ),
 ]
 
@@ -91,6 +122,7 @@ def scan_google_trends(geo: str = "US", max_items: int = 10) -> list[TrendingTop
     """
     Fetch trending topics from Google Trends RSS.
     Zero-auth, real-time query volume and news context.
+    Filters out sports and superficial gossip for high-retention documentary focus.
     """
     url = f"https://trends.google.com/trending/rss?geo={geo}"
     try:
@@ -102,10 +134,15 @@ def scan_google_trends(geo: str = "US", max_items: int = 10) -> list[TrendingTop
         items = root.findall(".//item")
         topics: list[TrendingTopic] = []
 
-        for item in items[:max_items]:
+        for item in items:
             title_el = item.find("title")
             title = title_el.text.strip() if title_el is not None and title_el.text else ""
             if not title:
+                continue
+
+            # Skip sports, games, and celebrity gossip
+            title_l = title.lower()
+            if any(banned in title_l for banned in BANNED_TOPIC_KEYWORDS):
                 continue
 
             traffic_el = item.find("ht:approx_traffic", ns)
@@ -212,6 +249,13 @@ def get_hottest_viral_topic(
         if niche_matches:
             chosen = random.choice(niche_matches[:3])
             logger.info("Selected niche-matched viral topic: %s (%s)", chosen.title, chosen.suggested_niche)
+            return chosen
+
+        # Never compromise the channel's niche: fallback to curated topic in that specific niche
+        niche_fallbacks = [t for t in EVERGREEN_FALLBACK_TRENDS if t.suggested_niche == preferred_niche]
+        if niche_fallbacks:
+            chosen = random.choice(niche_fallbacks)
+            logger.info("Using niche-matched evergreen topic: %s (%s)", chosen.title, chosen.suggested_niche)
             return chosen
 
     # 4. Otherwise pick from top high-velocity topics

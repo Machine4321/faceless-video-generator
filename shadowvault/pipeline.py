@@ -277,13 +277,74 @@ def main() -> None:
         help="Custom channel watermark handle (omitted by default)",
     )
 
+    parser.add_argument(
+        "-i", "--interactive",
+        action="store_true",
+        help="Interactive mode: select category or type custom topic",
+    )
+
     args = parser.parse_args()
 
     # Initialize logging and config
     from shadowvault.logging_config import setup_logging
     setup_logging()
 
-    if args.mode == "loop":
+    if getattr(args, "interactive", False):
+        print()
+        print("=" * 60)
+        print("🏛️  THE SHADOW VAULT - INTERACTIVE EPISODE CREATOR")
+        print("=" * 60)
+        print("Select category / focus for today's video:")
+        print("  [1] Heists & Impossible Crimes (heists)")
+        print("  [2] Classified Archives & Government Secrets (dark_psychology)")
+        print("  [3] Unexplained Mysteries & Anomalies (glitches)")
+        print("  [4] Horror & Dark Historical Events (horror)")
+        print("  [5] Today's Top Filtered Viral Trend (live Google Trends)")
+        print("  [6] Custom Topic (type your own story/case)")
+        choice = input("\nEnter choice [1-6, default=1]: ").strip() or "1"
+
+        if choice == "1":
+            chosen_niche = "heists"
+            use_trend = True
+            custom_topic = None
+        elif choice == "2":
+            chosen_niche = "dark_psychology"
+            use_trend = True
+            custom_topic = None
+        elif choice == "3":
+            chosen_niche = "glitches"
+            use_trend = True
+            custom_topic = None
+        elif choice == "4":
+            chosen_niche = "horror"
+            use_trend = True
+            custom_topic = None
+        elif choice == "5":
+            chosen_niche = "facts"
+            use_trend = True
+            custom_topic = None
+        elif choice == "6":
+            chosen_niche = "facts"
+            use_trend = False
+            custom_topic = input("Enter custom topic / case name: ").strip()
+        else:
+            chosen_niche = "heists"
+            use_trend = True
+            custom_topic = None
+
+        result = asyncio.run(
+            run_once(
+                niche=chosen_niche,
+                length=args.length,
+                upload=not args.no_upload,
+                privacy=args.privacy,
+                trend=use_trend,
+                topic=custom_topic,
+                no_sfx=args.no_sfx,
+                watermark=args.watermark,
+            )
+        )
+    elif args.mode == "loop":
         asyncio.run(
             run_pipeline_loop(
                 niche=args.niche,
