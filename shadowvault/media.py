@@ -225,6 +225,48 @@ def _create_procedural_backdrop(
     return dest_path
 
 
+def _extract_clean_search_terms(query: str, narration: str = "") -> list[str]:
+    """
+    Extract meaningful subject queries for stock media / image retrieval,
+    stripping camera jargon, lens details, and prompt filler words
+    so search engines (Pexels, Pollinations) receive high-relevance subject terms.
+    """
+    camera_noise = {
+        "35mm", "photo", "photograph", "photography", "photographer", "camera", "lens",
+        "macro", "close", "closeup", "ultra", "detailed", "realistic", "cinematic",
+        "hd", "4k", "8k", "dslr", "film", "still", "view", "wide", "angle", "setting",
+        "background", "wallpaper", "portrait", "vertical", "texture", "archival", "vintage",
+        "grainy", "eerie", "dark", "atmospheric", "shadow", "floor", "room", "style", "format",
+        "dynamic", "action", "shot", "video", "footage", "clip", "ready", "scene",
+        "up", "look", "looking", "capture", "capturing", "perspective", "a", "an",
+        "the", "of", "in", "on", "at", "to", "by", "from", "as", "into", "is", "it",
+        "he", "she", "they", "was", "were", "this", "that", "him", "her", "his",
+        "with", "and", "for", "showing", "featuring", "under", "about", "could", "would"
+    }
+
+    q_words = [w for w in re.findall(r"\b[A-Za-z0-9'-]+\b", query) if w.lower() not in camera_noise]
+    n_words = [w for w in re.findall(r"\b[A-Za-z0-9'-]+\b", narration) if w.lower() not in camera_noise]
+
+    queries: list[str] = []
+    if len(q_words) >= 3:
+        queries.append(" ".join(q_words[:3]))
+    if len(q_words) >= 2:
+        queries.append(" ".join(q_words[:2]))
+    if q_words:
+        queries.append(q_words[0])
+
+    if len(n_words) >= 2:
+        nq = " ".join(n_words[:2])
+        if nq not in queries:
+            queries.append(nq)
+    if n_words and n_words[0] not in queries:
+        queries.append(n_words[0])
+
+    if not queries:
+        queries = [query]
+    return queries
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -260,7 +302,6 @@ def fetch_scene_media(
             "source_desc": "Procedural Dark Cinema Backdrop (Pillow)",
         }
 
-    import re
     vformat = getattr(scene, "visual_format", "auto")
     text_lower = (scene.narration or "").lower()
 
@@ -273,6 +314,18 @@ def fetch_scene_media(
         elif any(w in text_lower for w in ["million", "billion", "dollars", "cash", "$", "worth", "stolen"]) and re.search(r"(\$[\d,]+|\b\d+\s*(?:million|billion)\b)", scene.narration, re.I):
             vformat = "counter"
         else:
+            vformat = "ai_image"
+
+    # Guard: Dossier format should ONLY be used for classified intelligence/crime
+    if vformat == "dossier":
+        dossier_keywords = ["fbi", "cia", "classified", "secret", "confidential", "investigation", "memo", "case file", "dossier", "agent", "heist", "police", "top secret"]
+        if not any(w in query.lower() or w in text_lower for w in dossier_keywords):
+            vformat = "newspaper" if any(w in text_lower for w in ["record", "rule", "headline", "news", "official", "judges", "competition"]) else "ai_image"
+
+    # Guard: Radar format should ONLY be used for actual signals/radio/astronomy/radar
+    if vformat == "radar":
+        radar_keywords = ["radar", "signal", "radio", "telescope", "mhz", "ghz", "frequency", "satellite", "space", "astronomy", "pulsar", "telemetry"]
+        if not any(w in query.lower() or w in text_lower for w in radar_keywords):
             vformat = "ai_image"
 
     # 1. Documentary Evidence Graphic: Newspaper Clipping (with highlighter effect)
@@ -413,20 +466,17 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("AI image generation call failed: %s", exc)
 
-    # 7. High-Resolution Portrait DSLR Photography from Pexels (for Ken Burns smooth motion)
+    # 7. High-Resolution Portrait Photography from Pexels
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
-        clean_q = re.sub(r"\b(astronaut|actor|man|woman|person|people|posing|costume|walking away|silhouette)\b", "dark atmospheric", query, flags=re.I).strip()
-        search_queries = [clean_q]
-        words = clean_q.split()
-        if len(words) > 2:
-            search_queries.append(" ".join(words[:2]))
-        search_queries.append("dark cinematic texture vertical")
+        search_queries = _extract_clean_search_terms(query, scene.narration)
 
-        # Prioritize 4K/8K DSLR photos over stock videos with actors
+        # Prioritize high-res portrait photography
         for sq in search_queries:
             photos = _search_pexels_photos(sq, api_key)
             if photos:
-                photo_url = photos[0].get("src", {}).get("large2x") or photos[0].get("src", {}).get("portrait")
+                pick_idx = (scene.scene_id - 1) % len(photos)
+                photo = photos[pick_idx]
+                photo_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("portrait")
                 if photo_url:
                     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
                     if _download_video(photo_url, dest):
@@ -435,14 +485,15 @@ def fetch_scene_media(
                             "path": dest,
                             "type": "image",
                             "format": "photo",
-                            "source_desc": f"Pexels High-Res Photo (Query: '{sq}')",
+                            "source_desc": f"Pexels High-Res Photo (Query: '{sq}', Alt: '{photo.get('alt', '')[:50]}')",
                         }
 
-        # 8. Pexels Video (only for atmospheric textures if photo not found)
+        # 8. High-Resolution Video from Pexels
         for sq in search_queries:
             videos = _search_pexels(sq, api_key)
             if videos:
-                best_link = _pick_best_file(videos[0].get("video_files", []))
+                pick_vidx = (scene.scene_id - 1) % len(videos)
+                best_link = _pick_best_file(videos[pick_vidx].get("video_files", []))
                 if best_link:
                     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
                     if _download_video(best_link, dest):
@@ -451,7 +502,7 @@ def fetch_scene_media(
                             "path": dest,
                             "type": "video",
                             "format": "video",
-                            "source_desc": f"Pexels Atmospheric B-Roll (Query: '{sq}', URL: {best_link[:60]}...)",
+                            "source_desc": f"Pexels Video Footage (Query: '{sq}', URL: {best_link[:60]}...)",
                         }
 
     # 9. Procedural cinematic backdrop fallback (only when completely offline or all APIs fail)

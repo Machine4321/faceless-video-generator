@@ -352,26 +352,31 @@ def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
     word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
     return f"""\
 You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris, Lemmino level).
-Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all generic AI fluff and structure every single second with rapid visual cuts and verifiable historical/scientific facts.
+Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all generic AI fluff and structure every single second with rapid visual cuts and verifiable facts.
 
-VIRAL TOPIC / INVESTIGATION:
-Topic: {topic}
-Context & Details: {summary}
+VIRAL TOPIC: {topic}
+CONTEXT & DETAILS: {summary}
 
 MANDATORY JOURNALISTIC & RETENTION RULES:
 1. ZERO AI CLICHÉS (STRICTLY BANNED):
-   - NEVER use: "Did you know", "Imagine", "NASA hid the truth", "they don't want you to know", "fed a lie", "leaving us to wonder", "shocking secret", "unravel the mystery".
-   - Write like a top-tier investigative journalist: cite exact years, exact locations, observatory/probe codenames, exact frequencies (e.g. 1,420 MHz), exact numbers, and verified documents.
-2. DOUBLED VISUAL RHYTHM (8 to 11 FAST-PACED MICRO-SCENES):
+   - NEVER use: "Did you know", "Imagine", "they don't want you to know", "fed a lie", "leaving us to wonder", "shocking secret", "unravel the mystery".
+   - Write like a top-tier investigative journalist: cite exact years, exact locations, exact names, exact frequencies/tempos/stats, and verified records.
+2. CRITICAL TOPIC RELEVANCE & VISUAL SYNCHRONIZATION:
+   - The topic is: "{topic}". EVERY SINGLE SCENE must directly portray and describe this specific subject.
+   - Do NOT hallucinate dark crime archives, space telescopes, or laboratories unless the topic is literally about space or laboratories!
+   - If the topic is about an animal, dance, sport, music, or event (e.g. "{topic}"), EVERY visual query MUST explicitly focus on that physical subject (e.g. canine dancer, salsa dancing dog, dancing paws, trainer on stage, crowd applause).
+   - Format selection rules:
+     * "ai_image": Ultra-detailed cinematic photograph depicting the exact action of {topic}.
+     * "photo": Archival or high-resolution photography of {topic}.
+     * "video": Motion footage of {topic}.
+     * "counter": Use when narrating a quantifiable metric or record. CRITICAL: When visual_format is "counter", the narration MUST speak the exact number and unit (e.g. "180 beats per minute", "50 million views", "99 percent synchronization", "first place 100 points").
+     * "newspaper": Use for breaking news, competition headline, or public sensation about {topic}.
+     * "dossier": ONLY if {topic} involves classified intelligence or crime. Otherwise use "ai_image" or "photo".
+     * "radar": ONLY if {topic} involves radio frequencies, astronomy, or radar telemetry. Otherwise use "ai_image" or "photo".
+3. DOUBLED VISUAL RHYTHM (8 to 11 FAST-PACED MICRO-SCENES):
    - Modern viewers drop off if a scene holds longer than 2.2 seconds.
    - Break the script into 8 to 11 sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.2 seconds).
-   - High visual contrast across scenes:
-     * "ai_image": Ultra-realistic 35mm film photograph, macro archival lens, grainy spy satellite, or dark laboratory.
-     * "radar": Military/scientific CRT radar scope or frequency telemetry monitor.
-     * "dossier": Physical classified FBI/CIA memo on tactical desk with red TOP SECRET stamp slam and redaction bars.
-     * "counter": Animated rising number / metric ticker (years, frequency, dollars, distance).
-     * "newspaper": Archival newspaper headline with fluorescent yellow highlighter wipe.
-3. RELENTLESS PACING & SEAMLESS LOOP:
+4. RELENTLESS PACING & SEAMLESS LOOP:
    - Total narration: ~{word_count} words (~22-26 seconds).
    - The cold open starts immediately in-media-res with an unbelievable recorded fact.
    - The final sentence delivers a bone-chilling twist or connects back seamlessly to the first sentence for infinite loop retention.
@@ -380,62 +385,48 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
   "title": "ALL-CAPS VIRAL THRILLER TITLE",
   "script": "Full narrative script...",
-  "visual_search": "primary_fallback_keyword",
+  "visual_search": "primary subject keyword directly describing {topic}",
   "tags": "#shorts #trending #viral #mystery",
   "scenes": [
     {{
       "scene_id": 1,
-      "narration": "First sentence matching the hook...",
-      "visual_query": "35mm archival photograph of ...",
+      "narration": "First punchy hook introducing {topic}...",
+      "visual_query": "cinematic vibrant photograph of {topic}...",
       "visual_format": "ai_image",
       "sfx_cue": "impact"
     }},
     {{
       "scene_id": 2,
-      "narration": "Exact measurement or instrument reading...",
-      "visual_query": "green CRT frequency monitor",
-      "visual_format": "radar",
-      "sfx_cue": "radar_ping"
+      "narration": "Second sentence showing the subject in action...",
+      "visual_query": "dynamic action shot of {topic} in movement...",
+      "visual_format": "ai_image",
+      "sfx_cue": "whoosh"
     }},
     {{
       "scene_id": 3,
-      "narration": "Classified memo or official denial...",
-      "visual_query": "classified memo details",
-      "visual_format": "dossier",
-      "sfx_cue": "stamp_thud"
+      "narration": "Exact measurement or shocking record: reaching 180 beats per minute...",
+      "visual_query": "high energy visual of {topic} matching the stat...",
+      "visual_format": "counter",
+      "sfx_cue": "ticker"
     }},
     {{
       "scene_id": 4,
-      "narration": "Macro look at the physical evidence...",
-      "visual_query": "macro close up of vintage magnetic tape audio spool",
+      "narration": "Close up detail or technique of {topic}...",
+      "visual_query": "macro close up of {topic}...",
       "visual_format": "ai_image",
       "sfx_cue": "paper_slide"
     }},
     {{
       "scene_id": 5,
-      "narration": "The shocking number or metric recorded...",
-      "visual_query": "recorded metric",
-      "visual_format": "counter",
-      "sfx_cue": "ticker"
-    }},
-    {{
-      "scene_id": 6,
-      "narration": "Breaking headline as details leaked...",
-      "visual_query": "breaking news investigation",
+      "narration": "Breaking headline as the world reacted...",
+      "visual_query": "historic press headline report about {topic}...",
       "visual_format": "newspaper",
       "sfx_cue": "highlighter"
     }},
     {{
-      "scene_id": 7,
-      "narration": "The deep unexplained anomaly...",
-      "visual_query": "dark eerie telescopic deep space photography",
-      "visual_format": "ai_image",
-      "sfx_cue": "whoosh"
-    }},
-    {{
-      "scene_id": 8,
-      "narration": "Final chilling twist that loops to the start...",
-      "visual_query": "mysterious vintage archive room silhouette",
+      "scene_id": 6,
+      "narration": "The viral reaction or unbelievable climax...",
+      "visual_query": "triumphant celebration or viral spectacle of {topic}...",
       "visual_format": "ai_image",
       "sfx_cue": "impact"
     }}

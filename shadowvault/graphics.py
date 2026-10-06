@@ -327,6 +327,14 @@ SCALES = {
 }
 
 UNITS_KEYWORDS = {
+    "beats per minute": "BPM",
+    "beat per minute": "BPM",
+    "steps per minute": "STEPS/MIN",
+    "step per minute": "STEPS/MIN",
+    "light-year": "LIGHT-YEARS",
+    "light-years": "LIGHT-YEARS",
+    "lightyear": "LIGHT-YEARS",
+    "lightyears": "LIGHT-YEARS",
     "ton": "TONS", "tons": "TONS",
     "dollar": "$", "dollars": "$",
     "hour": "HOURS", "hours": "HOURS",
@@ -335,11 +343,14 @@ UNITS_KEYWORDS = {
     "day": "DAYS", "days": "DAYS",
     "year": "YEARS", "years": "YEARS",
     "mile": "MILES", "miles": "MILES",
-    "light-year": "LIGHT-YEARS", "light-years": "LIGHT-YEARS",
-    "lightyear": "LIGHT-YEARS", "lightyears": "LIGHT-YEARS",
     "can": "CANS", "cans": "CANS",
     "layer": "LAYERS", "layers": "LAYERS",
     "percent": "%",
+    "bpm": "BPM", "beat": "BPM", "beats": "BPM",
+    "step": "STEPS/MIN", "steps": "STEPS/MIN",
+    "view": "VIEWS", "views": "VIEWS",
+    "stream": "STREAMS", "streams": "STREAMS",
+    "point": "POINTS", "points": "POINTS",
 }
 
 
@@ -347,7 +358,7 @@ def parse_stat_from_narration(narration: str, fallback_query: str = "") -> tuple
     """
     Intelligently extract the primary numerical stat, prefix, suffix, and contextual label
     from narration text, supporting both word numbers ("eighty-four thousand tons")
-    and digits ("$100M", "84,000", "72 seconds").
+    and digits ("$100M", "84,000", "72 seconds", "180 BPM").
     If narration has no numbers, checks fallback_query.
 
     Returns: (target_value, prefix, suffix, contextual_label)
@@ -358,16 +369,16 @@ def parse_stat_from_narration(narration: str, fallback_query: str = "") -> tuple
             continue
         clean = re.sub(r"(\w+)-(\w+)", r"\1 \2", candidate_text.lower())
 
-        # Detect unit across the sentence
+        # Detect unit across the sentence (longest match first)
         detected_unit = ""
-        for w, u in UNITS_KEYWORDS.items():
+        for w in sorted(UNITS_KEYWORDS.keys(), key=len, reverse=True):
             if re.search(r"\b" + re.escape(w) + r"\b", clean):
-                detected_unit = u
+                detected_unit = UNITS_KEYWORDS[w]
                 break
 
-        # 1. First check explicit digit patterns e.g. $100M, 84,000 tons, 10 layers, 1,420 mhz
+        # 1. First check explicit digit patterns e.g. $100M, 84,000 tons, 10 layers, 1,420 mhz, 180 bpm
         m_dig = re.search(
-            r"(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*\b(k|m|b|million|billion|thousand|mhz|ghz|tons|km)\b)?",
+            r"(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*\b(k|m|b|million|billion|thousand|mhz|ghz|tons|km|bpm|views)\b)?",
             clean,
         )
         if m_dig:
@@ -383,7 +394,7 @@ def parse_stat_from_narration(narration: str, fallback_query: str = "") -> tuple
             else:
                 num = int(raw_num)
             suffix = detected_unit if detected_unit != "$" else ""
-            if not suffix and scale_str in {"mhz", "ghz", "tons", "km"}:
+            if not suffix and scale_str in {"mhz", "ghz", "tons", "km", "bpm", "views"}:
                 suffix = scale_str.upper()
             return _categorize_stat(num, prefix, suffix, candidate_text)
 
@@ -414,24 +425,34 @@ def parse_stat_from_narration(narration: str, fallback_query: str = "") -> tuple
             suffix = detected_unit if detected_unit != "$" else ""
             return _categorize_stat(total, prefix, suffix, candidate_text)
 
-    # 3. Contextual intelligent fallback based on keywords instead of blind $100M
+    # 3. Contextual intelligent fallback based strictly on subject matter
     combined = f"{narration} {fallback_query}".lower()
+    if any(k in combined for k in ["salsa", "dance", "dog", "tempo", "rhythm", "music", "clave", "feet", "paws"]):
+        return (180, "", "BPM", "CANINE RHYTHMIC TEMPO")
     if any(k in combined for k in ["space", "astronomy", "signal", "radio", "telescope", "pulse", "wow"]):
         return (1420, "", "MHZ", "INTERCEPTED FREQUENCY")
     if any(k in combined for k in ["dust", "meteor", "venus", "debris", "tons", "acid"]):
         return (84000, "", "TONS", "ANNUAL SPACE DEBRIS")
     if any(k in combined for k in ["speed", "light", "distance", "galaxy", "orbit", "km"]):
         return (60, "", "KM", "ATMOSPHERIC ALTITUDE")
+    if any(k in combined for k in ["view", "views", "viral", "tiktok", "youtube"]):
+        return (50_000_000, "", "VIEWS", "GLOBAL VIRAL AUDIENCE")
     if any(k in combined for k in ["year", "century", "decades", "timeline"]):
         return (49, "", "YEARS", "RECORDED TIMELINE")
+    if any(k in combined for k in ["heist", "stolen", "vault", "cash", "dollar", "robbery"]):
+        return (100_000_000, "$", "", "STOLEN VALUATION")
 
-    return (100_000_000, "$", "", "DOCUMENTED RECORD")
+    return (100, "", "%", "RECORDED PRECISION")
 
 
 def _categorize_stat(num: int, prefix: str, suffix: str, text: str) -> tuple[int, str, str, str]:
     """Determine high-impact contextual label based on metric and subject."""
     text_l = text.lower()
-    if "debris" in text_l or "dust" in text_l or suffix == "TONS":
+    if suffix in {"BPM", "STEPS/MIN"} or any(w in text_l for w in ["tempo", "salsa", "dance", "rhythm"]):
+        label = "CANINE RHYTHMIC TEMPO"
+    elif suffix in {"VIEWS", "STREAMS"} or any(w in text_l for w in ["viral", "views"]):
+        label = "GLOBAL VIRAL AUDIENCE"
+    elif "debris" in text_l or "dust" in text_l or suffix == "TONS":
         label = "ANNUAL SPACE DEBRIS"
     elif "layer" in text_l or suffix == "LAYERS":
         label = "VAULT SECURITY PROTOCOLS"
