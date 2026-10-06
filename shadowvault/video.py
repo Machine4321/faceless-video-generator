@@ -317,11 +317,24 @@ def _build_kinetic_subtitle_clips(
     for i in range(0, len(word_timings), words_per_chunk):
         chunks.append(word_timings[i : i + words_per_chunk])
 
-    for chunk in chunks:
+    for chunk_idx, chunk in enumerate(chunks):
         words = [wt.word for wt in chunk]
         for active_idx, wt in enumerate(chunk):
             start = wt.start
-            end = wt.end
+            # Bridge gap to next word in chunk so the subtitle box NEVER flickers off
+            if active_idx < len(chunk) - 1:
+                end = max(wt.end, chunk[active_idx + 1].start)
+            else:
+                # If gap to next chunk is small (<0.35s), hold subtitle continuously
+                if chunk_idx < len(chunks) - 1:
+                    next_start = chunks[chunk_idx + 1][0].start
+                    if 0 < next_start - wt.end < 0.35:
+                        end = next_start
+                    else:
+                        end = wt.end
+                else:
+                    end = wt.end
+
             duration = max(0.12, end - start)
 
             try:
