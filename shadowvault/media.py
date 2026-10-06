@@ -164,7 +164,7 @@ def fetch_scene_media(
     Fetch best media (video or photo) for an individual scene.
     Returns dict: {'scene_id': int, 'path': str, 'type': 'video'|'image'}
     """
-    if not api_key:
+    if api_key is None:
         from shadowvault.config import get_config
         try:
             api_key = get_config().pexels_api_key
@@ -174,26 +174,34 @@ def fetch_scene_media(
     os.makedirs(temp_dir, exist_ok=True)
     query = scene.visual_query or "cinematic mystery"
 
-    # 1. Try Pexels Video
+    # 1. Try Pexels Video (multi-tier query for maximum hit rate)
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
-        videos = _search_pexels(query, api_key)
-        if videos:
-            best_link = _pick_best_file(videos[0].get("video_files", []))
-            if best_link:
-                dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
-                if _download_video(best_link, dest):
-                    return {"scene_id": scene.scene_id, "path": dest, "type": "video"}
+        search_queries = [query]
+        words = query.split()
+        if len(words) > 2:
+            search_queries.append(" ".join(words[:2]))
+        search_queries.append("cinematic vertical")
+
+        for sq in search_queries:
+            videos = _search_pexels(sq, api_key)
+            if videos:
+                best_link = _pick_best_file(videos[0].get("video_files", []))
+                if best_link:
+                    dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
+                    if _download_video(best_link, dest):
+                        return {"scene_id": scene.scene_id, "path": dest, "type": "video"}
 
         # 2. Try Pexels Photo (portrait high-res for Ken Burns)
-        photos = _search_pexels_photos(query, api_key)
-        if photos:
-            photo_url = photos[0].get("src", {}).get("large2x") or photos[0].get("src", {}).get("portrait")
-            if photo_url:
-                dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
-                if _download_video(photo_url, dest):
-                    return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        for sq in search_queries:
+            photos = _search_pexels_photos(sq, api_key)
+            if photos:
+                photo_url = photos[0].get("src", {}).get("large2x") or photos[0].get("src", {}).get("portrait")
+                if photo_url:
+                    dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
+                    if _download_video(photo_url, dest):
+                        return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
 
-    # 3. Procedural cinematic backdrop fallback
+    # 3. Procedural cinematic backdrop fallback (only when offline or no API key)
     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
     _create_procedural_backdrop(scene.scene_id, dest)
     return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
@@ -218,7 +226,7 @@ def fetch_multi_scene_media(
     is_fallback = False
 
     for scene in scenes:
-        item = fetch_scene_media(scene, temp_dir, api_key)
+        item = fetch_scene_media(scene, temp_dir, api_key=api_key)
         scenes_media.append(item)
         if not primary_path:
             primary_path = item["path"]

@@ -68,7 +68,7 @@ class Config:
     elevenlabs_voice_id: str = "pNInz6obpgq5paNsJ7vm"
 
     # --- Gemini ---
-    gemini_model: str = "gemini-2.0-flash"
+    gemini_model: str = "gemini-3.5-flash"
 
     # --- Video ---
     output_width: int = 1080
@@ -79,6 +79,7 @@ class Config:
     preset: str = "ultrafast"
     bg_music_volume: float = 0.12
     trail_seconds: float = 1.5
+    watermark_handle: str = ""
 
     # --- Paths ---
     music_folder: str = ""
@@ -126,7 +127,7 @@ def load_config() -> Config:
         tts_rate=_env("TTS_RATE", "-6%"),
         tts_pitch=_env("TTS_PITCH", "-5Hz"),
         elevenlabs_voice_id=_env("ELEVENLABS_VOICE_ID", "pNInz6obpgq5paNsJ7vm"),
-        gemini_model=_env("GEMINI_MODEL", "gemini-2.0-flash"),
+        gemini_model=_env("GEMINI_MODEL", "gemini-3.5-flash"),
         output_width=_env_int("OUTPUT_WIDTH", 1080),
         output_height=_env_int("OUTPUT_HEIGHT", 1920),
         fps=_env_int("FPS", 24),
@@ -135,6 +136,7 @@ def load_config() -> Config:
         preset=_env("PRESET", "ultrafast"),
         bg_music_volume=_env_float("BG_MUSIC_VOLUME", 0.12),
         trail_seconds=_env_float("TRAIL_SECONDS", 1.5),
+        watermark_handle=_env("WATERMARK_HANDLE", ""),
         music_folder=_resolve_path(_env("MUSIC_FOLDER"), "music"),
         sfx_folder=_resolve_path(_env("SFX_FOLDER"), "sfx"),
         output_folder=_resolve_path(_env("OUTPUT_FOLDER"), "output"),

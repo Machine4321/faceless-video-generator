@@ -22,7 +22,7 @@ import random
 import re
 from typing import Any
 
-from shadowvault.models import ContentResult, ScenePlan
+from shadowvault.models import ContentResult, ScenePlan, TrendingTopic
 from shadowvault.utils.text_utils import clean_text, strip_json_fences
 
 logger = logging.getLogger(__name__)
@@ -328,8 +328,49 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
       "visual_query": "specific search phrase for pexels",
       "sfx_cue": "impact"
     }}
+}}"""
+
+
+def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
+    word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
+    return f"""\
+You are an elite viral documentary storyteller for YouTube Shorts and TikTok.
+Your videos consistently get millions of views by turning trending news and bizarre discoveries into high-tension thriller narratives.
+
+VIRAL TOPIC / EVENT TO COVER:
+Topic: {topic}
+Context & Details: {summary}
+
+TASK:
+1. Write an ultra-gripping viral short-form script (~{word_count} words).
+   Pacing & Structure:
+   - First sentence MUST be a pattern-interrupting In-Media-Res hook (under 12 words) that grabs the viewer in 1 second.
+   - Jump straight into the unbelievable anomaly, conflict, or twist.
+   - Build relentless tension with every sentence.
+   - Deliver an unexpected revelation or mind-bending conclusion at the end.
+   - Break the script into 5 to 7 sequential visual scenes (1-2 punchy sentences per scene).
+   - For each scene, specify a vivid portrait Pexels stock footage visual query (2-3 English words, e.g. "telescope stars dark", "police flashing lights", "laboratory glowing science") and an audio SFX cue ("impact", "whoosh", "glitch", "cash", "heartbeat").
+
+2. ALL-CAPS VIRAL CLICKBAIT TITLE (under 8 words, ultra-compelling).
+3. Primary English fallback search keyword (1-2 words).
+4. 8-12 high-engagement hashtags (including #shorts, #trending, and topic tags).
+
+RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
+{{
+  "title": "ALL-CAPS TITLE",
+  "script": "Full narrative text...",
+  "visual_search": "primary_keyword",
+  "tags": "#shorts #trending #viral",
+  "scenes": [
+    {{
+      "scene_id": 1,
+      "narration": "First sentence matching the hook...",
+      "visual_query": "specific search phrase for pexels",
+      "sfx_cue": "impact"
+    }}
   ]
 }}"""
+
 
 
 def _split_into_scenes(script: str, default_keyword: str) -> list[ScenePlan]:
@@ -412,6 +453,7 @@ def generate_content(
     length: str = "short",
     api_key: str | None = None,
     model: str | None = None,
+    topic: str | TrendingTopic | None = None,
 ) -> ContentResult:
     """
     Generate a short-form video script via Google Gemini.
@@ -422,6 +464,7 @@ def generate_content(
     length  : "short" (~65 words) or "long" (~130 words)
     api_key : Gemini API key (loaded from config if None)
     model   : Gemini model name (loaded from config if None)
+    topic   : Optional viral trending topic string or TrendingTopic instance
 
     Returns
     -------
@@ -433,15 +476,26 @@ def generate_content(
         api_key = api_key or cfg.gemini_api_key
         model = model or cfg.gemini_model
 
-    niche = niche if niche in NICHE_CONFIG else DEFAULT_NICHE
-    hook = _pick_hook(niche)
-
-    logger.info("Generating content | niche=%s length=%s", niche, length)
+    if topic is not None:
+        if isinstance(topic, TrendingTopic):
+            topic_title = topic.title
+            topic_summary = topic.summary
+            niche = topic.suggested_niche or niche
+        else:
+            topic_title = str(topic)
+            topic_summary = str(topic)
+        hook = topic_title
+        prompt = _build_trend_prompt(topic_title, topic_summary, length)
+        logger.info("Generating trend-focused content | topic=%r niche=%s length=%s", topic_title, niche, length)
+    else:
+        niche = niche if niche in NICHE_CONFIG else DEFAULT_NICHE
+        hook = _pick_hook(niche)
+        prompt = _build_prompt(niche, hook, length)
+        logger.info("Generating content | niche=%s length=%s", niche, length)
 
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
-        prompt = _build_prompt(niche, hook, length)
 
         response = client.models.generate_content(
             model=model,
@@ -459,6 +513,26 @@ def generate_content(
         logger.warning("Gemini returned invalid JSON (%s) - using fallback", exc)
     except Exception as exc:
         logger.warning("Gemini API error (%s) - using fallback", exc)
+
+    if topic is not None:
+        # Dynamic fallback for trend topics
+        clean_kw = " ".join([w.lower() for w in re.findall(r"\b[A-Za-z]{4,}\b", topic_title)][:2]) or "mystery"
+        scenes = [
+            ScenePlan(1, f"Did you hear what just happened with {topic_title}?", f"{clean_kw} dark", "impact"),
+            ScenePlan(2, f"{topic_summary}", f"{clean_kw} dramatic", "whoosh"),
+            ScenePlan(3, "Experts are still scrambling to explain the full impact.", "investigation dark", "whoosh"),
+            ScenePlan(4, "This completely changes everything we thought we knew.", "neon mysterious cinematic", "glitch"),
+            ScenePlan(5, "What do you think is really going on here?", "space night question", "impact"),
+        ]
+        return ContentResult(
+            title=f"THE TRUTH ABOUT {topic_title.upper()[:40]}",
+            script=" ".join(s.narration for s in scenes),
+            visual_search_keyword=clean_kw,
+            tags=f"#shorts #{clean_kw} #trending #viral",
+            niche=niche,
+            hook=scenes[0].narration,
+            scenes=scenes,
+        )
 
     fallback = NICHE_CONFIG[niche]["fallback"]
     logger.info("Using fallback content for niche=%s (scenes=%d)", niche, len(fallback.scenes))

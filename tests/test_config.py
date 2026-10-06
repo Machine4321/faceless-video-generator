@@ -19,6 +19,8 @@ def _set_required_env(monkeypatch):
     """Set the minimum required env vars."""
     monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
     monkeypatch.setenv("PEXELS_API_KEY", "test-pexels-key")
+    monkeypatch.delenv("BG_MUSIC_VOLUME", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
 
 
 def test_missing_gemini_key_raises(monkeypatch):
@@ -133,7 +135,7 @@ def test_float_env_var_parsing(monkeypatch, _set_required_env):
 
 def test_gemini_model_default(monkeypatch, _set_required_env):
     cfg = load_config()
-    assert cfg.gemini_model == "gemini-2.0-flash"
+    assert cfg.gemini_model == "gemini-3.5-flash"
 
 
 def test_gemini_model_custom(monkeypatch, _set_required_env):

@@ -83,13 +83,26 @@ class UploadResult:
 
 
 @dataclass
+class TrendingTopic:
+    """A hot viral topic discovered from real-time internet trends."""
+    title: str
+    summary: str
+    source: str = "google_trends"  # "google_trends", "reddit", "wikipedia", "hackernews"
+    search_volume: str = ""
+    suggested_niche: str = "facts"  # "facts", "glitches", "heists", "business", "horror"
+    keywords: list[str] = field(default_factory=list)
+
+
+@dataclass
 class PipelineRun:
     """Aggregates all stage results for a single pipeline execution."""
     run_id: int = 0
     niche: str = "horror"
+    trend_topic: Optional[TrendingTopic] = None
     content: Optional[ContentResult] = None
     media: Optional[MediaResult] = None
     audio: Optional[AudioResult] = None
     video: Optional[VideoResult] = None
     upload: Optional[UploadResult] = None
     temp_files: list[str] = field(default_factory=list)
+

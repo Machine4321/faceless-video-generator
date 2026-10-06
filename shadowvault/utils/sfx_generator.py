@@ -39,31 +39,34 @@ def _save_wav(filename: str, audio: np.ndarray, sample_rate: int = SAMPLE_RATE) 
         wf.writeframes(int_audio.tobytes())
 
 
-def generate_whoosh(duration: float = 0.45) -> np.ndarray:
-    """Generate a clean cinematic whoosh / swoosh using shaped noise and pitch sweep."""
+def generate_whoosh(duration: float = 0.35) -> np.ndarray:
+    """Generate a smooth, subtle cinematic air swoosh (gentle scene cut transition)."""
     n_samples = int(SAMPLE_RATE * duration)
     t = np.linspace(0, duration, n_samples, endpoint=False)
 
-    # Bell envelope centered at 45% of duration
+    # Smooth bell envelope centered at 45% of duration
     peak = duration * 0.45
-    env = np.exp(-((t - peak) ** 2) / (2 * (0.12 ** 2)))
+    env = np.exp(-((t - peak) ** 2) / (2 * (0.09 ** 2)))
 
-    # Noise base
-    noise = np.random.uniform(-1, 1, n_samples)
+    # Soft low-pass filtered noise to remove any harsh hiss
+    raw_noise = np.random.uniform(-1, 1, n_samples)
+    kernel_size = 55  # Heavy smoothing low-pass filter
+    noise = np.convolve(raw_noise, np.ones(kernel_size)/kernel_size, mode="same")
 
-    # Modulating sweep (sine sweep 180Hz -> 850Hz -> 120Hz)
-    freq = 180 + 670 * np.sin(np.pi * t / duration)
-    phase = 2 * np.pi * np.cumsum(freq) / SAMPLE_RATE
-    tone = np.sin(phase)
+    # Gentle low air sweep (50Hz -> 140Hz -> 45Hz)
+    sub_freq = 50 + 90 * np.sin(np.pi * t / duration)
+    phase = 2 * np.pi * np.cumsum(sub_freq) / SAMPLE_RATE
+    sub = np.sin(phase)
 
-    audio = (0.65 * noise + 0.35 * tone) * env
-    # Smooth fade out at edges
-    fade_len = int(SAMPLE_RATE * 0.02)
-    audio[:fade_len] *= np.linspace(0, 1, fade_len)
-    audio[-fade_len:] *= np.linspace(1, 0, fade_len)
+    audio = (0.70 * noise + 0.30 * sub) * env
+
+    # Smooth fade in/out
+    fade = int(SAMPLE_RATE * 0.04)
+    audio[:fade] *= np.linspace(0, 1, fade)
+    audio[-fade:] *= np.linspace(1, 0, fade)
 
     max_val = np.max(np.abs(audio)) or 1.0
-    return audio / max_val * 0.85
+    return audio / max_val * 0.25
 
 
 def generate_impact(duration: float = 1.2) -> np.ndarray:

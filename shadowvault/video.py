@@ -115,6 +115,22 @@ def _load_font(size: int, bold: bool = False) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
+def _load_emoji_font(size: int) -> Optional[ImageFont.FreeTypeFont]:
+    """Find a dedicated color emoji font (Segoe UI Emoji on Windows, Noto/Apple on other OS)."""
+    candidates = [
+        r"C:\Windows\Fonts\seguiemj.ttf",
+        "seguiemj.ttf",
+        "/System/Library/Fonts/Apple Color Emoji.ttc",
+        "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            continue
+    return None
+
+
 def _detect_emoji(words: Sequence[str]) -> Optional[str]:
     """Return an emoji if any word in the sequence matches a high-retention keyword."""
     for w in words:
@@ -155,18 +171,21 @@ def _render_kinetic_chunk_frame(
     start_x = (canvas_w - total_w) // 2
     base_y = canvas_h // 2
 
-    # Draw Emoji above the chunk if detected
+    # Draw Emoji above the chunk ONLY if supported emoji font exists
+    # This prevents the missing-glyph empty box [▯] bug on Windows/Linux
     if emoji:
-        try:
-            emoji_font = _load_font(font_size - 10, bold=False)
-            draw.text(
-                (canvas_w // 2, base_y - font_size - 10),
-                emoji,
-                font=emoji_font,
-                anchor="mm",
-            )
-        except Exception:
-            pass
+        emoji_font = _load_emoji_font(font_size)
+        if emoji_font is not None:
+            try:
+                draw.text(
+                    (canvas_w // 2, base_y - font_size - 15),
+                    emoji,
+                    font=emoji_font,
+                    anchor="mm",
+                    embedded_color=True,
+                )
+            except Exception:
+                pass
 
     # Draw Words horizontally with drop shadow
     curr_x = start_x
@@ -247,17 +266,19 @@ def _render_watermark_frame(
     width: int,
     height: int,
     handle: str = "@The_ShadowVaultOfficial",
-    font_size: int = 38,
-    font_color: tuple = (255, 255, 255, 160),
+    font_size: int = 34,
+    font_color: tuple = (255, 255, 255, 140),
     position_y: int = 1800,
 ) -> np.ndarray:
     """Render channel watermark to numpy RGBA array."""
     img = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    if not handle or not handle.strip():
+        return np.array(img)
     draw = ImageDraw.Draw(img)
     font = _load_font(font_size, bold=False)
     draw.text(
         (width // 2, position_y),
-        handle,
+        handle.strip(),
         font=font,
         fill=font_color,
         anchor="mm",
@@ -503,12 +524,13 @@ def _mix_audio_advanced(
     bg_music_volume: float,
     sfx_folder: str = "",
     scene_count: int = 1,
+    enable_sfx: bool = True,
 ) -> CompositeAudioClip | AudioFileClip:
     """
     Advanced sound designer:
     - Auto-ducks background music during speech
-    - Injects cinematic whoosh at scene transitions
-    - Injects impact boom at the beginning hook
+    - Injects subtle cinematic whoosh at scene transitions
+    - Injects subtle impact boom at the beginning hook
     """
     audio_tracks = [voice_clip]
 
@@ -530,21 +552,21 @@ def _mix_audio_advanced(
             except Exception as exc:
                 logger.warning("Background music failed: %s", exc)
 
-    # 2. SFX Injection (only if sfx_folder is provided and valid directory)
-    if sfx_folder and os.path.isdir(sfx_folder):
+    # 2. SFX Injection (only if enabled and sfx_folder is provided)
+    if enable_sfx and sfx_folder and os.path.isdir(sfx_folder):
         sfx_map = ensure_default_sfx(sfx_folder)
         try:
-            # Hook impact boom at t = 0.05s
+            # Subtle hook impact boom at t = 0.05s
             if "impact" in sfx_map and os.path.isfile(sfx_map["impact"]):
-                impact_clip = AudioFileClip(sfx_map["impact"]).volumex(0.65).set_start(0.05)
+                impact_clip = AudioFileClip(sfx_map["impact"]).volumex(0.35).set_start(0.05)
                 audio_tracks.append(impact_clip)
 
-            # Whooshes on scene cuts
+            # Soft subtle whoosh on scene cuts
             if scene_count > 1 and "whoosh" in sfx_map and os.path.isfile(sfx_map["whoosh"]):
                 scene_interval = total_duration / scene_count
                 for sc in range(1, scene_count):
                     cut_time = sc * scene_interval
-                    whoosh_clip = AudioFileClip(sfx_map["whoosh"]).volumex(0.45).set_start(cut_time)
+                    whoosh_clip = AudioFileClip(sfx_map["whoosh"]).volumex(0.18).set_start(cut_time)
                     audio_tracks.append(whoosh_clip)
         except Exception as exc:
             logger.warning("SFX mixing encountered minor issue: %s", exc)
@@ -582,6 +604,8 @@ def compose_video(
     output_height: int | None = None,
     ffmpeg_path: str | None = None,
     sfx_folder: str | None = None,
+    watermark_handle: str | None = None,
+    enable_sfx: bool = True,
 ) -> VideoResult:
     """
     Compose the final high-retention vertical Short from all fetched assets.
@@ -602,6 +626,7 @@ def compose_video(
     output_height = output_height if output_height is not None else cfg.output_height
     ffmpeg_path = ffmpeg_path or cfg.ffmpeg_path
     sfx_folder = sfx_folder or getattr(cfg, "sfx_folder", "")
+    watermark_handle = watermark_handle if watermark_handle is not None else getattr(cfg, "watermark_handle", "")
 
     # Configure ffmpeg path if specified
     if ffmpeg_path:
@@ -657,6 +682,7 @@ def compose_video(
         bg_music_volume=bg_music_volume,
         sfx_folder=sfx_folder,
         scene_count=scene_count,
+        enable_sfx=enable_sfx,
     )
     bg = bg.set_audio(final_audio)
 
@@ -668,28 +694,57 @@ def compose_video(
         word_timings=getattr(audio, "word_timings", None),
     )
 
-    # 4. Subtle Clean Watermark Overlay
-    watermark_frame = _render_watermark_frame(output_width, output_height)
-    watermark_clip = (
-        ImageClip(watermark_frame)
-        .set_duration(total_duration)
-        .set_position((0, 0))
-    )
+    # 4. Clean Watermark Overlay (Only added if explicitly configured)
+    all_layers = [bg] + sub_clips
+    if watermark_handle and watermark_handle.strip():
+        watermark_frame = _render_watermark_frame(output_width, output_height, handle=watermark_handle.strip())
+        watermark_clip = (
+            ImageClip(watermark_frame)
+            .set_duration(total_duration)
+            .set_position((0, 0))
+        )
+        all_layers.append(watermark_clip)
 
     # 5. Composite Final Master
-    all_layers = [bg] + sub_clips + [watermark_clip]
     final_video = CompositeVideoClip(all_layers, size=(output_width, output_height))
 
     logger.info("Rendering master video -> %s", output_path)
-    final_video.write_videofile(
-        output_path,
-        fps=fps,
-        codec=codec,
-        audio_codec="aac",
-        preset=preset,
-        threads=4,
-        logger=None,
-    )
+    try:
+        final_video.write_videofile(
+            output_path,
+            fps=fps,
+            codec=codec,
+            audio_codec="aac",
+            preset=preset,
+            threads=4,
+            logger=None,
+        )
+    finally:
+        # Explicitly release open file locks on Windows
+        try:
+            final_video.close()
+        except Exception:
+            pass
+        if hasattr(bg, "clips"):
+            for sc in bg.clips:
+                try:
+                    sc.close()
+                    if hasattr(sc, "reader") and sc.reader:
+                        sc.reader.close()
+                except Exception:
+                    pass
+        try:
+            bg.close()
+            if hasattr(bg, "reader") and bg.reader:
+                bg.reader.close()
+        except Exception:
+            pass
+        try:
+            voice_clip.close()
+            if hasattr(voice_clip, "reader") and voice_clip.reader:
+                voice_clip.reader.close()
+        except Exception:
+            pass
 
     logger.info("Video composition complete: %s (duration=%.2fs)", output_path, total_duration)
 

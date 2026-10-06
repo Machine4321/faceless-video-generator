@@ -204,3 +204,32 @@ class TestViralNiches:
             for sc in fb.scenes:
                 assert sc.narration
                 assert sc.visual_query
+
+
+class TestWatermarkAndTrends:
+    def test_watermark_empty_returns_blank(self):
+        from shadowvault.video import _render_watermark_frame
+        frame = _render_watermark_frame(1080, 1920, handle="")
+        assert frame.shape == (1920, 1080, 4)
+        assert frame[:, :, 3].max() == 0, "Empty handle must result in 100% transparent frame"
+
+    def test_watermark_with_handle_renders(self):
+        from shadowvault.video import _render_watermark_frame
+        frame = _render_watermark_frame(1080, 1920, handle="@MyCustomHandle")
+        assert frame.shape == (1920, 1080, 4)
+        assert frame[:, :, 3].max() > 0, "Custom handle must render text"
+
+    def test_content_with_trend_topic(self):
+        from shadowvault.content import generate_content
+        from shadowvault.models import TrendingTopic
+        topic = TrendingTopic(
+            title="Youngest Exoplanet Discovered",
+            summary="Astronomers detected a baby planet.",
+            source="google_trends",
+            suggested_niche="facts",
+        )
+        # Using api_key="fake-key" triggers the dynamic trend fallback safely
+        res = generate_content(api_key="fake-key", topic=topic)
+        assert "YOUNGEST EXOPLANET" in res.title.upper()
+        assert len(res.scenes) >= 3
+

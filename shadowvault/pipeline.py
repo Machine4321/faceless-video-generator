@@ -34,39 +34,62 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 async def run_once(
-    niche: str = "horror",
+    niche: str = "facts",
     length: str = "short",
     upload: bool = True,
     privacy: str = "public",
     uploader: Optional[YouTubeUploader] = None,
     run_id: Optional[int] = None,
+    trend: bool = False,
+    topic: Optional[str] = None,
+    no_sfx: bool = False,
+    watermark: Optional[str] = None,
 ) -> PipelineRun:
     """
     Execute one full pipeline run.
 
     Parameters
     ----------
-    niche    : "horror" | "motivation" | "facts"
-    length   : "short" | "long"
-    upload   : whether to upload to YouTube
-    privacy  : "public" | "unlisted" | "private"
-    uploader : pre-authenticated YouTubeUploader (created if None)
-    run_id   : integer identifier (random if None)
+    niche     : "horror" | "motivation" | "facts" | "heists" | "glitches" | "business" | "dark_psychology"
+    length    : "short" | "long"
+    upload    : whether to upload to YouTube
+    privacy   : "public" | "unlisted" | "private"
+    uploader  : pre-authenticated YouTubeUploader (created if None)
+    run_id    : integer identifier (random if None)
+    trend     : whether to scan live internet trends (Google Trends/Wikipedia)
+    topic     : custom topic override
+    no_sfx    : whether to disable sound effect transitions
+    watermark : custom channel watermark handle (empty by default)
     """
     if run_id is None:
         run_id = random.randint(10_000, 99_999)
 
     run = PipelineRun(run_id=run_id, niche=niche)
     logger.info("=" * 60)
-    logger.info("PIPELINE RUN #%d | niche=%s length=%s", run_id, niche, length)
+    logger.info("PIPELINE RUN #%d | niche=%s length=%s trend=%s", run_id, niche, length, trend)
     logger.info("=" * 60)
 
     try:
+        # Stage 0: Viral Trend Discovery (if enabled)
+        trend_topic = None
+        if trend:
+            logger.info("[0/5] Scanning hottest viral trends ...")
+            from shadowvault.trend_scanner import get_hottest_viral_topic
+            trend_topic = get_hottest_viral_topic(preferred_niche=niche if niche != "facts" else None)
+            run.trend_topic = trend_topic
+            logger.info("[0/5] Viral trend selected: %r [%s] from %s", trend_topic.title, trend_topic.suggested_niche, trend_topic.source)
+            niche = trend_topic.suggested_niche or niche
+            run.niche = niche
+
         # Stage 1: Content generation
         logger.info("[1/5] Generating content ...")
-        run.content = content_stage.generate_content(niche=niche, length=length)
-        logger.info("[1/5] Done | title=%r | keyword=%s",
-                     run.content.title, run.content.visual_search_keyword)
+        chosen_topic = trend_topic if trend_topic is not None else topic
+        if chosen_topic:
+            run.content = content_stage.generate_content(niche=niche, length=length, topic=chosen_topic)
+        else:
+            run.content = content_stage.generate_content(niche=niche, length=length)
+        logger.info("[1/5] Done | title=%r | keyword=%s | scenes=%d",
+                     run.content.title, run.content.visual_search_keyword, len(run.content.scenes))
 
         # Stage 2: Background visual sourcing
         logger.info("[2/5] Sourcing visual media ...")
@@ -104,6 +127,8 @@ async def run_once(
                 audio=run.audio,
                 script=run.content.script,
                 title=run.content.title,
+                watermark_handle=watermark,
+                enable_sfx=(not no_sfx),
             ),
         )
         logger.info("[4/5] Done | output=%s", run.video.video_path)
@@ -229,6 +254,28 @@ def main() -> None:
         action="store_true",
         help="Render video but do not upload to YouTube",
     )
+    parser.add_argument(
+        "--trend",
+        action="store_true",
+        help="Scan and use the hottest live viral trend from Google Trends / Wikipedia",
+    )
+    parser.add_argument(
+        "--topic",
+        type=str,
+        default=None,
+        help="Generate a video on a custom topic or headline",
+    )
+    parser.add_argument(
+        "--no-sfx",
+        action="store_true",
+        help="Disable sound effect transitions (whooshes, impacts)",
+    )
+    parser.add_argument(
+        "--watermark",
+        type=str,
+        default="",
+        help="Custom channel watermark handle (omitted by default)",
+    )
 
     args = parser.parse_args()
 
@@ -251,6 +298,10 @@ def main() -> None:
                 length=args.length,
                 upload=not args.no_upload,
                 privacy=args.privacy,
+                trend=args.trend,
+                topic=args.topic,
+                no_sfx=args.no_sfx,
+                watermark=args.watermark,
             )
         )
         print()
