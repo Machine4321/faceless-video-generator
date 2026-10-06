@@ -1,9 +1,17 @@
 """
 shadowvault/content.py
-Stage 1 - Content Generation via Google Gemini.
+Stage 1 - Viral Content Generation via Google Gemini with Multi-Scene Planning.
 
-Supports niches: horror, motivation, facts.
-Falls back to hardcoded content when the API is unavailable.
+Supports niches:
+- heists          : Legendary robberies, scams, and masterminds.
+- glitches        : Bizarre anomalies and glitches in history.
+- business        : Ruthless corporate moves and marketing genius.
+- dark_psychology : Mind games, FBI interrogation tricks, psychological paradoxes.
+- horror          : Chilling true mysteries and forbidden archives.
+- motivation      : Relentless discipline and high-energy drive.
+- facts           : Unbelievable scientific and historical truths.
+
+Falls back gracefully to rich multi-scene presets when API is unavailable.
 """
 
 from __future__ import annotations
@@ -11,9 +19,10 @@ from __future__ import annotations
 import json
 import logging
 import random
+import re
 from typing import Any
 
-from shadowvault.models import ContentResult
+from shadowvault.models import ContentResult, ScenePlan
 from shadowvault.utils.text_utils import clean_text, strip_json_fences
 
 logger = logging.getLogger(__name__)
@@ -25,10 +34,142 @@ WORD_COUNTS: dict[str, int] = {
 }
 
 # ---------------------------------------------------------------------------
-# Niche configuration
+# Niche configuration & Multi-Scene Fallbacks
 # ---------------------------------------------------------------------------
 
 NICHE_CONFIG: dict[str, dict[str, Any]] = {
+    "heists": {
+        "hooks": [
+            "He stole $100M from a vault... using only an apple and hairspray.",
+            "This man sold the Eiffel Tower twice, and police never caught him.",
+            "The greatest diamond heist in history was solved because of a sandwich.",
+            "He robbed 20 banks without holding a single weapon.",
+        ],
+        "style": (
+            "You are a master viral storyteller for YouTube Shorts and TikTok. "
+            "Write fast-paced, high-stakes heist and scam breakdowns. "
+            "Focus on the unbelievable flaw in security, the clever trick, and the absurd detail that exposed them."
+        ),
+        "fallback": ContentResult(
+            title="THE $100M DIAMOND HEIST SOLVED BY A SANDWICH",
+            script=(
+                "In 2003, an Italian thief bypassed ten layers of vault security in Antwerp to steal one hundred million dollars in diamonds. "
+                "He used hairspray to blind heat sensors and magnetic tape to trick infrared beams. "
+                "The vault was impenetrable, yet he left without triggering a single alarm. "
+                "Detectives were completely baffled until they searched the highway nearby. "
+                "His accomplice had discarded a half-eaten salami sandwich with his DNA on the crust. "
+                "One hundred million dollars vanished forever, all undone by a single bite."
+            ),
+            visual_search_keyword="diamonds vault heist",
+            tags="#shorts #heist #truestory #crime #mystery #history #viral",
+            niche="heists",
+            hook="The greatest diamond heist in history was solved because of a sandwich.",
+            scenes=[
+                ScenePlan(1, "In 2003, an Italian thief bypassed ten layers of vault security in Antwerp to steal one hundred million dollars in diamonds.", "bank vault security dark diamonds", "impact"),
+                ScenePlan(2, "He used hairspray to blind heat sensors and magnetic tape to trick infrared beams.", "laser alarm security camera cinematic", "whoosh"),
+                ScenePlan(3, "The vault was impenetrable, yet he left without triggering a single alarm.", "dark vault door open empty safe", "whoosh"),
+                ScenePlan(4, "Detectives were completely baffled until they searched the highway nearby.", "police investigation flashing lights crime scene", "glitch"),
+                ScenePlan(5, "His accomplice had discarded a half-eaten salami sandwich with his DNA on the crust.", "dna evidence forensics laboratory macro", "whoosh"),
+                ScenePlan(6, "One hundred million dollars vanished forever, all undone by a single bite.", "cash falling dark luxury slow motion", "cash"),
+            ],
+        ),
+    },
+    "glitches": {
+        "hooks": [
+            "In 1518, an entire city started dancing until they dropped dead.",
+            "In World War Two, the US military deployed an army made entirely of rubber.",
+            "An island remained on world maps for 120 years before anyone realized it didn't exist.",
+        ],
+        "style": (
+            "You are a creator exploring surreal, unbelievable historical glitches and anomalies. "
+            "Keep the delivery punchy, authoritative, and gripping."
+        ),
+        "fallback": ContentResult(
+            title="THE HISTORICAL GLITCH NOBODY CAN EXPLAIN",
+            script=(
+                "In July 1518, a woman stepped into a town square in France and began violently dancing. "
+                "Within days, hundreds of people joined her, unable to stop. "
+                "Doctors prescribed more dancing, claiming it would cure the fever. "
+                "Dozens died of exhaustion and heart attacks right in front of onlookers. "
+                "To this day, modern science cannot fully explain the dancing plague."
+            ),
+            visual_search_keyword="ancient city fog mystery",
+            tags="#shorts #history #glitches #mystery #creepyfacts #viral",
+            niche="glitches",
+            hook="In 1518, an entire city started dancing until they dropped dead.",
+            scenes=[
+                ScenePlan(1, "In July 1518, a woman stepped into a town square in France and began violently dancing.", "medieval town cobblestone dramatic fog", "impact"),
+                ScenePlan(2, "Within days, hundreds of people joined her, unable to stop.", "crowd mysterious movement shadows silhouette", "whoosh"),
+                ScenePlan(3, "Doctors prescribed more dancing, claiming it would cure the fever.", "old parchment medical vintage archival", "whoosh"),
+                ScenePlan(4, "Dozens died of exhaustion and heart attacks right in front of onlookers.", "dramatic dark hospital vintage horror", "heartbeat"),
+                ScenePlan(5, "To this day, modern science cannot fully explain the dancing plague.", "ancient dusty library old books candle", "glitch"),
+            ],
+        ),
+    },
+    "business": {
+        "hooks": [
+            "Red Bull conquered the world by filling trash cans with empty cans.",
+            "Blockbuster laughed Netflix out of the boardroom in 2000.",
+            "Ferrari insulted a tractor mechanic, accidentally creating Lamborghini.",
+        ],
+        "style": (
+            "You are a viral business and psychology analyst. "
+            "Expose the counter-intuitive power moves and brutal rivalries that built billion-dollar empires."
+        ),
+        "fallback": ContentResult(
+            title="HOW RED BULL TRICKED THE ENTIRE WORLD",
+            script=(
+                "When Red Bull first launched, absolutely nobody wanted to drink it. "
+                "Competitors had millions in advertising, while Red Bull was on the brink of bankruptcy. "
+                "So the founder did something insane: he filled London trash cans with empty Red Bull cans. "
+                "People saw overflowing bins outside nightclubs and assumed everyone was drinking it. "
+                "Demand exploded overnight. Today, Red Bull sells over twelve billion cans a year."
+            ),
+            visual_search_keyword="nightclub luxury city neon",
+            tags="#shorts #business #marketing #money #success #wealth #billionaire",
+            niche="business",
+            hook="Red Bull conquered the world by filling trash cans with empty cans.",
+            scenes=[
+                ScenePlan(1, "When Red Bull first launched, absolutely nobody wanted to drink it.", "empty street night rain dramatic", "impact"),
+                ScenePlan(2, "Competitors had millions in advertising, while Red Bull was on the brink of bankruptcy.", "corporate boardroom glass skyscraper", "whoosh"),
+                ScenePlan(3, "So the founder did something insane: he filled London trash cans with empty Red Bull cans.", "nightclub neon lights crowd city party", "whoosh"),
+                ScenePlan(4, "People saw overflowing bins outside nightclubs and assumed everyone was drinking it.", "busy street pedestrians urban time lapse", "cash"),
+                ScenePlan(5, "Demand exploded overnight. Today, Red Bull sells over twelve billion cans a year.", "sports car speed champion race luxury", "cash"),
+            ],
+        ),
+    },
+    "dark_psychology": {
+        "hooks": [
+            "If someone insults you, pause and whisper this single sentence.",
+            "FBI interrogators use this 3-second silence to make anyone confess.",
+            "The smartest people pretend to be naive for this one reason.",
+        ],
+        "style": (
+            "You are a psychological profiler. Deliver punchy, intense psychological insights "
+            "that make the viewer feel like they are learning a classified interrogation secret."
+        ),
+        "fallback": ContentResult(
+            title="THE 3-SECOND FBI TRICK THAT EXPOSES LIARS",
+            script=(
+                "When an FBI interrogator suspects someone is lying, they never argue. "
+                "Instead, they repeat the suspect's last three words as a question, then maintain complete silence. "
+                "Silence creates immense psychological discomfort in the human brain. "
+                "To fill the void, the liar will over-explain, giving away details they never intended to share. "
+                "Never fear the silence. Use it."
+            ),
+            visual_search_keyword="interrogation room shadow dark",
+            tags="#shorts #psychology #mindset #fbi #bodylanguage #darkpsychology #manipulation",
+            niche="dark_psychology",
+            hook="FBI interrogators use this 3-second silence to make anyone confess.",
+            scenes=[
+                ScenePlan(1, "When an FBI interrogator suspects someone is lying, they never argue.", "interrogation room dim lamp silhouette", "impact"),
+                ScenePlan(2, "Instead, they repeat the suspect's last three words as a question, then maintain complete silence.", "close up intense eyes stare dramatic", "heartbeat"),
+                ScenePlan(3, "Silence creates immense psychological discomfort in the human brain.", "brain nervous system pulses abstract", "whoosh"),
+                ScenePlan(4, "To fill the void, the liar will over-explain, giving away details they never intended to share.", "whisper microphone audio soundwave", "glitch"),
+                ScenePlan(5, "Never fear the silence. Use it.", "confident businessman shadow silhouette walking", "impact"),
+            ],
+        ),
+    },
     "horror": {
         "hooks": [
             "This is a true story that will keep you awake.",
@@ -60,6 +201,12 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
             tags="#shorts #horror #scary #mystery #creepypasta #fyp #viral #darkfacts",
             niche="horror",
             hook="Don't look behind you.",
+            scenes=[
+                ScenePlan(1, "Don't look behind you. The shadows in your room shift when you blink.", "dark bedroom shadows moving creepy", "impact"),
+                ScenePlan(2, "Three people reported seeing a figure standing in the corner of their bedroom for weeks before they disappeared.", "shadow figure hallway dark silhouette", "heartbeat"),
+                ScenePlan(3, "Authorities found their homes perfectly clean. No signs of struggle.", "police crime scene empty room dust", "whoosh"),
+                ScenePlan(4, "Just one detail that matched every case: every mirror in the house had been turned to face the wall.", "mirror reflection dark fog horror", "glitch"),
+            ],
         ),
     },
     "motivation": {
@@ -88,6 +235,13 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
             tags="#shorts #motivation #mindset #success #fyp #viral",
             niche="motivation",
             hook="Nobody will tell you this.",
+            scenes=[
+                ScenePlan(1, "Nobody will tell you this. Discipline is not something you feel.", "athlete running dark morning mist", "impact"),
+                ScenePlan(2, "It is something you build, brick by brick, on the days you least want to show up.", "heavy weights gym intense workout chalk", "whoosh"),
+                ScenePlan(3, "Every person you admire was once sitting exactly where you are right now.", "businessman looking city view window sunrise", "whoosh"),
+                ScenePlan(4, "The only difference between them and you is that they chose to start.", "mountain summit climber reaching top clouds", "whoosh"),
+                ScenePlan(5, "Today is your day to start.", "fire spark blazing dark cinematic", "impact"),
+            ],
         ),
     },
     "facts": {
@@ -116,6 +270,13 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
             tags="#shorts #facts #mindblown #science #fyp #viral #didyouknow",
             niche="facts",
             hook="You were never taught this in school.",
+            scenes=[
+                ScenePlan(1, "You were never taught this in school.", "vintage classroom dusty chalkboard mysterious", "impact"),
+                ScenePlan(2, "The human brain cannot distinguish between a vivid memory and a real event.", "brain glowing synapses neural network 3d", "whoosh"),
+                ScenePlan(3, "Every memory you have has been silently rewritten each time you recalled it.", "photograph burning disappearing into ashes slow motion", "whoosh"),
+                ScenePlan(4, "The person you think you were five years ago?", "person looking into dark water reflection distorted", "glitch"),
+                ScenePlan(5, "That version of you was quietly edited out of your own mind.", "cosmic space stars eye zoom galaxy", "impact"),
+            ],
         ),
     },
 }
@@ -140,26 +301,62 @@ def _build_prompt(niche: str, hook: str, length: str = "short") -> str:
 {cfg['style']}
 
 TASK:
-1. Write a script that starts with: "{hook}"
-   The script must be approximately {word_count} words.
-   Story structure rules:
-   - First sentence is a powerful hook (already given above).
-   - Build tension continuously.
-   - Keep the reveal hidden until the very last sentence.
-   - The final sentence must be the most impactful line.
-   - Do NOT summarize or add "THE END" or any meta-commentary.
+1. Write a viral short-form script that starts with: "{hook}"
+   Target total length: ~{word_count} words.
+   Story rules:
+   - First sentence is the explosive hook (already given).
+   - In-media-res pacing (no slow introductions).
+   - Build relentless tension or curiosity with every sentence.
+   - Deliver an unexpected twist or punchline at the end.
+   - Break the script into 5 to 7 sequential scenes (each scene 1-2 punchy sentences).
+   - For each scene, provide a highly specific portrait stock footage search query and an optional SFX cue.
 
 2. Write a short, ALL-CAPS clickbait title (under 10 words).
-3. Provide exactly ONE English keyword for a background video (e.g. "foggy forest").
-4. Provide 10-15 viral hashtags for the niche.
+3. Provide one primary English keyword for fallback background video.
+4. Provide 8-12 viral hashtags.
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
-  "title": "...",
-  "script": "...",
-  "visual_search": "...",
-  "tags": "..."
+  "title": "ALL-CAPS VIRAL TITLE",
+  "script": "Full narrative text...",
+  "visual_search": "primary_keyword",
+  "tags": "#shorts #topic #viral",
+  "scenes": [
+    {{
+      "scene_id": 1,
+      "narration": "First sentence matching the hook...",
+      "visual_query": "specific search phrase for pexels",
+      "sfx_cue": "impact"
+    }}
+  ]
 }}"""
+
+
+def _split_into_scenes(script: str, default_keyword: str) -> list[ScenePlan]:
+    """Helper to auto-split a plain script into 4-6 sequential scenes if scenes not provided."""
+    sentences = re.split(r"(?<=[.!?])\s+", script.strip())
+    sentences = [s.strip() for s in sentences if s.strip()]
+    if not sentences:
+        return [ScenePlan(1, script, default_keyword, "impact")]
+
+    scenes: list[ScenePlan] = []
+    sfx_choices = ["whoosh", "impact", "glitch", "cash", "heartbeat"]
+
+    for idx, sentence in enumerate(sentences, start=1):
+        cue = "impact" if idx == 1 else ("whoosh" if idx < len(sentences) else "impact")
+        # Generate varied visual query based on sentence keywords
+        words = [re.sub(r"[^\w]", "", w).lower() for w in sentence.split()]
+        filtered = [w for w in words if len(w) > 4 and w not in {"there", "their", "about", "would", "could", "should", "every", "before"}]
+        query = " ".join(filtered[:3]) if filtered else default_keyword
+        scenes.append(
+            ScenePlan(
+                scene_id=idx,
+                narration=sentence,
+                visual_query=query,
+                sfx_cue=cue,
+            )
+        )
+    return scenes
 
 
 def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
@@ -172,13 +369,37 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
     if missing:
         raise ValueError(f"Gemini response missing keys: {missing}")
 
+    title = clean_text(data["title"])
+    script = clean_text(data["script"])
+    visual_search = clean_text(data["visual_search"]).split()[0]
+    tags = clean_text(data["tags"])
+
+    # Parse multi-scene plan if provided by model
+    scenes: list[ScenePlan] = []
+    raw_scenes = data.get("scenes")
+    if isinstance(raw_scenes, list) and len(raw_scenes) >= 2:
+        for idx, item in enumerate(raw_scenes, start=1):
+            if isinstance(item, dict) and "narration" in item:
+                scenes.append(
+                    ScenePlan(
+                        scene_id=item.get("scene_id", idx),
+                        narration=clean_text(item["narration"]),
+                        visual_query=clean_text(item.get("visual_query", visual_search)),
+                        sfx_cue=item.get("sfx_cue") or ("whoosh" if idx > 1 else "impact"),
+                    )
+                )
+
+    if not scenes:
+        scenes = _split_into_scenes(script, visual_search)
+
     return ContentResult(
-        title=clean_text(data["title"]),
-        script=clean_text(data["script"]),
-        visual_search_keyword=clean_text(data["visual_search"]).split()[0],
-        tags=clean_text(data["tags"]),
+        title=title,
+        script=script,
+        visual_search_keyword=visual_search,
+        tags=tags,
         niche=niche,
         hook=hook,
+        scenes=scenes,
     )
 
 
@@ -197,14 +418,14 @@ def generate_content(
 
     Parameters
     ----------
-    niche   : "horror", "motivation", or "facts"
+    niche   : "heists", "glitches", "business", "dark_psychology", "horror", "motivation", or "facts"
     length  : "short" (~65 words) or "long" (~130 words)
     api_key : Gemini API key (loaded from config if None)
     model   : Gemini model name (loaded from config if None)
 
     Returns
     -------
-    ContentResult. Falls back to hardcoded content on API failure.
+    ContentResult. Falls back to rich multi-scene content on API failure.
     """
     if api_key is None or model is None:
         from shadowvault.config import get_config
@@ -231,7 +452,7 @@ def generate_content(
         logger.debug("Gemini raw response: %s", raw_text[:200])
 
         result = _parse_response(raw_text, niche, hook)
-        logger.info("Content generated: title=%r", result.title)
+        logger.info("Content generated: title=%r (scenes=%d)", result.title, len(result.scenes))
         return result
 
     except json.JSONDecodeError as exc:
@@ -240,5 +461,5 @@ def generate_content(
         logger.warning("Gemini API error (%s) - using fallback", exc)
 
     fallback = NICHE_CONFIG[niche]["fallback"]
-    logger.info("Using fallback content for niche=%s", niche)
+    logger.info("Using fallback content for niche=%s (scenes=%d)", niche, len(fallback.scenes))
     return fallback

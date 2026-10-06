@@ -82,6 +82,7 @@ class Config:
 
     # --- Paths ---
     music_folder: str = ""
+    sfx_folder: str = ""
     output_folder: str = ""
     temp_dir: str = ""
     log_dir: str = ""
@@ -135,6 +136,7 @@ def load_config() -> Config:
         bg_music_volume=_env_float("BG_MUSIC_VOLUME", 0.12),
         trail_seconds=_env_float("TRAIL_SECONDS", 1.5),
         music_folder=_resolve_path(_env("MUSIC_FOLDER"), "music"),
+        sfx_folder=_resolve_path(_env("SFX_FOLDER"), "sfx"),
         output_folder=_resolve_path(_env("OUTPUT_FOLDER"), "output"),
         temp_dir=_resolve_path(_env("TEMP_DIR"), "temp"),
         log_dir=_resolve_path(_env("LOG_DIR"), "logs"),

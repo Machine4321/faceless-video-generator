@@ -1,20 +1,18 @@
-# 🎬 Shadowvault AI Studio
+# 🎬 Faceless Video Engine (Next-Gen AI Shorts Studio)
 
-> An enterprise-grade, fully automated, asynchronous video production and distribution pipeline. Built with Python, powered by Gemini Generative AI, MoviePy composition, and premium Text-to-Speech integrations including **ElevenLabs** and **Edge-TTS**.
+> An automated, studio-grade vertical video production pipeline designed for **YouTube Shorts, TikTok, and Instagram Reels**. Engineered to stand out from low-effort AI slop with **multi-scene B-roll editing, Ken Burns camera dynamics, millisecond-accurate word-by-word kinetic captions (MrBeast / Hormozi style), and dynamic sound design (SFX)**.
 
 ---
 
-## 🚀 Key Features
+## ⚡ Why This Stands Out (AI Slop vs Studio Quality)
 
-- **Asynchronous Pipeline Orchestration**: Leverages Python's `asyncio` to run intensive stages (data fetching, TTS, and upload workflows) concurrently.
-- **Dynamic AI Content Architect**: Integrated with **Gemini AI** to autonomously generate high-engagement scripts, titles, and contextual media-search keywords based on content niches.
-- **Multi-Provider Speech Synthesis Engine**:
-  - 💎 **ElevenLabs API Integration**: Modern, highly realistic voice generation via high-performance async REST requests using `aiohttp`.
-  - ⚡ **Edge-TTS**: Lightning-fast, lightweight fallback engine for standard voice narration.
-- **Media Asset Sourcing**: Automated asset acquisition pipelines linking into Pexels and Pixabay APIs for high-resolution vertical footage matching the AI-generated context.
-- **Robust Video Composition Engine**: Automatically handles vertical (9:16) scaling, video-audio synchronization, dynamic trailing, and audio layering using MoviePy.
-- **Autonomous Distribution Pipeline**: Seamless OAuth2 integration with the YouTube Data API v3 for automated video uploading, scheduling, and metadata syncing.
-- **Configurability**: Fully driven by secure environment variables (`.env`) with a type-safe, frozen configuration layer.
+| Feature | Generic AI Slop (0 views) | This Faceless Video Engine (Viral Retention) |
+| :--- | :--- | :--- |
+| **Hook (0-2s)** | *"Did you know that in 1990..."* | **In-Media-Res Pattern Interrupt**: *"He stole $100M with a $2 can of hairspray."* |
+| **Visuals & Pacing** | 60s of the same looped Minecraft or GTA ramp | **5–8 dynamic scene cuts** (every 3–5s) with smooth Ken Burns zoom & pan |
+| **Subtitles** | Unsynced plain text block at the bottom | **Word-by-word glowing kinetic subtitles** (#FFE500 neon yellow pop + contextual emojis) |
+| **Sound & SFX** | Monotonous robot without effects | **Natural Neural Voice** + transition whooshes, sub-bass impacts, and auto-ducked music |
+| **Niches** | Oversaturated generic reddit gossip | **High-converting niches**: Heists & Scams, Glitches in History, Business Rivalries, Dark Psychology |
 
 ---
 
@@ -22,13 +20,13 @@
 
 ```mermaid
 graph TD
-    A[Pipeline Start] --> B[Stage 1: Gemini AI Script & SEO Gen]
-    B --> C[Stage 2: Stock Video Sourcing - Pexels/Pixabay]
-    B --> D[Stage 3: Premium TTS Narration - ElevenLabs/Edge]
-    C --> E[Stage 4: Asynchronous Video Assembly]
+    A[Pipeline Start] --> B[Stage 1: Multi-Scene Script & Hook Engine]
+    B --> C[Stage 2: Stock Footage & Ken Burns Sourcing - Pexels/Pixabay]
+    B --> D[Stage 3: Edge-TTS / ElevenLabs + WordBoundary Timestamps]
+    C --> E[Stage 4: Kinetic Captions, SFX Mixing & 1080x1920 Master Render]
     D --> E
-    E --> F[Stage 5: Automated YouTube OAuth2 Upload]
-    F --> G[Target Destination: YouTube Shorts]
+    E --> F[Stage 5: Autonomous YouTube Shorts OAuth2 Distribution]
+    F --> G[Target Destination: YouTube Shorts / TikTok / Reels]
 ```
 
 ---
@@ -36,99 +34,89 @@ graph TD
 ## 📦 Installation & Setup
 
 ### 1. Prerequisites
-- **Python**: version 3.9 or higher
-- **FFmpeg**: Required on the system PATH for media encoding/decoding
+- **Python**: version 3.9 or higher (3.12+ fully supported)
+- **FFmpeg**: Automatically detected on system PATH
 
 ### 2. Install Project in Editable Mode
-Clone the repository and install the development dependencies:
+Clone the repository and install dependencies in a virtual environment:
 ```bash
-pip install -e .
+python -m venv venv
+.\venv\Scripts\pip install -e .
+.\venv\Scripts\pip install pytest pytest-asyncio
 ```
 
 ### 3. Configure the Environment
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env`:
 ```env
 # === Required API Keys ===
+# Add your keys for live generation. Offline/test mode works out-of-the-box with rich presets!
 GEMINI_API_KEY=your-gemini-api-key-here
 PEXELS_API_KEY=your-pexels-api-key-here
 
-# === Optional API Keys ===
-PIXABAY_API_KEY=your-pixabay-api-key-here
-
 # === TTS Settings ===
-TTS_PROVIDER=elevenlabs                 # "elevenlabs" or "edge"
-ELEVENLABS_API_KEY=your-elevenlabs-key
-ELEVENLABS_VOICE_ID=pNInz6obpgq5paNsJ7vm
-
-# Fallback Edge-TTS Configuration
+TTS_PROVIDER=edge                       # "edge" (free, zero-config) or "elevenlabs"
 TTS_VOICE=en-US-ChristopherNeural
-TTS_RATE=-6%
-TTS_PITCH=-5Hz
-
-# === Gemini Settings ===
-GEMINI_MODEL=gemini-2.0-flash
+TTS_RATE=-4%
+TTS_PITCH=-4Hz
 
 # === Video Specifications ===
 OUTPUT_WIDTH=1080
 OUTPUT_HEIGHT=1920
 FPS=24
 CODEC=libx264
-AUDIO_CODEC=aac
 PRESET=ultrafast
-BG_MUSIC_VOLUME=0.12
-TRAIL_SECONDS=1.5
+BG_MUSIC_VOLUME=0.10
+TRAIL_SECONDS=1.2
 
 # === Paths ===
 MUSIC_FOLDER=music
+SFX_FOLDER=sfx
 OUTPUT_FOLDER=output
 TEMP_DIR=temp
 LOG_DIR=logs
 ARCHIVE_FOLDER=uploaded_archive
-
-# === YouTube OAuth2 Credentials ===
-CLIENT_SECRETS_FILE=client_secrets.json
-TOKEN_PICKLE_FILE=token.pickle
-
-# === Automation Loop Settings ===
-MAX_VIDEOS_PER_DAY=5
-INTER_VIDEO_DELAY_MIN=14400
-INTER_VIDEO_DELAY_MAX=21600
 ```
-
-### 4. YouTube OAuth Authentication
-Place your `client_secrets.json` (downloaded from Google Cloud Console under YouTube Data API v3 OAuth credentials) into the root folder. On first run, a secure browser window will open to authenticate the session, saving a persistent session token to `token.pickle`.
 
 ---
 
 ## 🕹️ CLI Usage & Operations
 
-Shadowvault comes with a pre-configured CLI script mapping.
-
-### Standard Execution (Single Run)
+### 1. Single Video Generation (Dry Run / Local Render)
+Generate a studio-quality video with multi-scene cuts, SFX, and kinetic captions without uploading:
 ```bash
-shadowvault --mode once --niche horror
+# Heist & Scam Mastermind story
+python -m shadowvault.pipeline --mode once --niche heists --no-upload
+
+# Bizarre glitch in history
+python -m shadowvault.pipeline --mode once --niche glitches --no-upload
+
+# Ruthless business power move
+python -m shadowvault.pipeline --mode once --niche business --no-upload
+
+# FBI interrogation & dark psychology secrets
+python -m shadowvault.pipeline --mode once --niche dark_psychology --no-upload
 ```
 
-### Dry Run (Render only, skip YouTube distribution)
+### 2. Single Video Generation with YouTube Upload
 ```bash
-shadowvault --mode once --niche horror --no-upload
+python -m shadowvault.pipeline --mode once --niche heists --privacy unlisted
 ```
 
-### Fully Autonomous Loop (Continuous Pipeline)
-Runs an infinite orchestration loop with parameterized daily caps and randomized inter-video publication delays to maintain a human-like schedule:
+### 3. Fully Autonomous Scheduling Loop
+Runs an automated scheduled production pipeline with randomized intervals and daily safety caps:
 ```bash
-shadowvault --mode loop --niche motivation --privacy unlisted
+python -m shadowvault.pipeline --mode loop --niche heists --privacy public
 ```
 
 ### CLI Command Options
 
 | Option | Valid Values | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `--mode` | `once`, `loop` | `once` | Single automated render/upload or persistent automation loop. |
-| `--niche` | `horror`, `motivation`, `facts` | `horror` | Target content category for AI generation. |
-| `--length` | `short`, `long` | `short` | Desired output length of video. |
-| `--privacy` | `public`, `unlisted`, `private` | `public` | Default privacy standard on YouTube upload. |
-| `--no-upload` | *Flag* | — | Prevents pipeline from executing the YouTube API Stage. |
+| `--mode` | `once`, `loop` | `once` | Single automated render/upload or continuous scheduled loop. |
+| `--niche` | `heists`, `glitches`, `business`, `dark_psychology`, `horror`, `motivation`, `facts` | `horror` | Storytelling category. |
+| `--length` | `short`, `long` | `short` | Desired video length (short = ~30-45s, long = ~60s). |
+| `--privacy` | `public`, `unlisted`, `private` | `public` | Default privacy on YouTube upload. |
+| `--no-upload` | *Flag* | — | Renders video to `output/` without calling YouTube API. |
 
 ---
 
@@ -137,27 +125,34 @@ shadowvault --mode loop --niche motivation --privacy unlisted
 ```
 ├── shadowvault/
 │   ├── __init__.py
-│   ├── pipeline.py          # Pipeline orchestration, async scheduling, CLI entry
+│   ├── pipeline.py          # Orchestrator, CLI interface, and execution loop
 │   ├── config.py            # Strongly-typed environment configuration layer
-│   ├── models.py            # Pipeline run models and validation dataclasses
-│   ├── content.py           # Stage 1: Gemini AI Script & SEO optimization
-│   ├── media.py             # Stage 2: Stock assets crawling via Pexels/Pixabay APIs
-│   ├── audio.py             # Stage 3: Premium ElevenLabs & Edge-TTS sound engine
-│   ├── video.py             # Stage 4: MoviePy video compilation & composition
-│   ├── upload.py            # Stage 5: YouTube API v3 distribution client
-│   ├── logging_config.py    # Standardized system-wide logging
+│   ├── models.py            # Dataclasses: WordTiming, ScenePlan, PipelineRun
+│   ├── content.py           # Stage 1: In-Media-Res hook & multi-scene script architect
+│   ├── media.py             # Stage 2: Multi-scene Pexels video & photo asset crawler
+│   ├── audio.py             # Stage 3: Edge-TTS & ElevenLabs with WordBoundary sync
+│   ├── video.py             # Stage 4: Kinetic subtitles, Ken Burns, SFX mixer, and master render
+│   ├── upload.py            # Stage 5: YouTube Data API v3 OAuth2 client
+│   ├── logging_config.py    # Standardized logging
 │   └── utils/
-│       └── file_manager.py  # Automated garbage-cleanup of temporary assets
-├── pyproject.toml           # Package manifests and dependency declarations
-├── .env.example             # Documented template for environmental tokens
-└── README.md                # Technical system documentation
+│       ├── file_manager.py  # Temp file garbage cleanup
+│       ├── sfx_generator.py # Procedural sound effects generator (whoosh, impact, cash)
+│       └── text_utils.py    # String cleaning & JSON fence stripping
+├── sfx/                     # Studio sound effects (whoosh.wav, impact.wav, cash.wav, etc.)
+├── music/                   # Curated background soundtracks
+├── output/                  # Final 1080x1920 MP4 video outputs
+├── tests/                   # 200 unit tests verifying all pipeline stages
+├── pyproject.toml           # Package configuration & dependencies
+├── .env.example             # Configuration template
+├── PROJECT_BRIEF.md         # Blueprint & roadmap documentation
+└── README.md
 ```
 
 ---
 
-## 🧪 Development & Testing
+## 🧪 Testing
 
-Run unit tests via `pytest` to verify the pipeline stages:
+Run the full automated test suite (200 tests):
 ```bash
 pytest
 ```

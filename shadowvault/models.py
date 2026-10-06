@@ -10,6 +10,27 @@ from typing import Optional
 
 
 @dataclass
+class WordTiming:
+    """Word-level timing event for kinetic subtitles."""
+    word: str
+    start: float  # seconds
+    end: float    # seconds
+
+
+@dataclass
+class ScenePlan:
+    """Individual visual/narration scene within a video."""
+    scene_id: int
+    narration: str
+    visual_query: str
+    sfx_cue: Optional[str] = None  # e.g. "whoosh", "impact", "cash", "glitch"
+    duration: float = 0.0          # Measured or estimated duration in seconds
+    visual_path: Optional[str] = None
+    visual_type: str = "video"     # "video" or "image"
+    caption_highlight_words: list[str] = field(default_factory=list)
+
+
+@dataclass
 class ContentResult:
     """Output of Stage 1 (content.py)."""
     title: str
@@ -18,6 +39,7 @@ class ContentResult:
     tags: str
     niche: str = "horror"
     hook: str = ""
+    scenes: list[ScenePlan] = field(default_factory=list)
 
 
 @dataclass
@@ -29,6 +51,7 @@ class MediaResult:
     duration: float = 0.0
     source_url: str = ""
     is_fallback: bool = False
+    scenes_media: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -37,6 +60,7 @@ class AudioResult:
     audio_path: str
     duration: float = 0.0
     voice: str = "en-US-ChristopherNeural"
+    word_timings: list[WordTiming] = field(default_factory=list)
 
 
 @dataclass

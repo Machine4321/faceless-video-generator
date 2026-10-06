@@ -68,13 +68,19 @@ async def run_once(
         logger.info("[1/5] Done | title=%r | keyword=%s",
                      run.content.title, run.content.visual_search_keyword)
 
-        # Stage 2: Background video fetch
-        logger.info("[2/5] Fetching background video ...")
-        run.media = media_stage.fetch_background_video(
-            keyword=run.content.visual_search_keyword,
-        )
-        if run.media.video_path:
-            run.temp_files.append(run.media.video_path)
+        # Stage 2: Background visual sourcing
+        logger.info("[2/5] Sourcing visual media ...")
+        if getattr(run.content, "scenes", None) and len(run.content.scenes) > 1:
+            run.media = media_stage.fetch_multi_scene_media(run.content.scenes)
+            for sc in getattr(run.media, "scenes_media", []):
+                if sc.get("path"):
+                    run.temp_files.append(sc["path"])
+        else:
+            run.media = media_stage.fetch_background_video(
+                keyword=run.content.visual_search_keyword,
+            )
+            if run.media.video_path:
+                run.temp_files.append(run.media.video_path)
         logger.info("[2/5] Done | fallback=%s", run.media.is_fallback)
 
         # Stage 3: Audio generation (async)
@@ -202,7 +208,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--niche",
-        choices=["horror", "motivation", "facts"],
+        choices=["horror", "motivation", "facts", "heists", "glitches", "business", "dark_psychology"],
         default="horror",
         help="Content niche",
     )

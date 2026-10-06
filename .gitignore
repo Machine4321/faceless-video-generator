@@ -19,8 +19,14 @@ temp_voice.mp3
 
 # Rendered videos
 ShadowVault_*.mp4
+FacelessVideo_*.mp4
 Vault_*.mp4
 *_thumb.jpg
+
+# Environments
+venv/
+.venv/
+MagicMock/
 
 # Python
 __pycache__/
