@@ -65,36 +65,57 @@ async def _synthesise(
     """
     Synthesise speech with Edge-TTS using WordBoundary streaming.
     Saves audio file and returns exact word timings.
+    Includes clean text normalization and fallback voices for 100% reliability.
     """
-    communicate = edge_tts.Communicate(
-        text,
-        voice,
-        rate=rate,
-        pitch=pitch,
-        boundary="WordBoundary",
-    )
-    word_timings: list[WordTiming] = []
+    clean_text = text.replace("—", ", ").replace("–", ", ").replace('"', '').strip()
+    voices_to_try = [voice]
+    for alt_voice in ["en-US-ChristopherNeural", "en-US-GuyNeural", "en-US-BrianNeural"]:
+        if alt_voice not in voices_to_try:
+            voices_to_try.append(alt_voice)
 
-    with open(output_path, "wb") as f:
-        async for chunk in communicate.stream():
-            chunk_type = chunk.get("type")
-            if chunk_type == "audio":
-                f.write(chunk.get("data", b""))
-            elif chunk_type == "WordBoundary":
-                word = chunk.get("text", "").strip()
-                if word:
-                    offset_sec = chunk.get("offset", 0) / 10_000_000.0
-                    dur_sec = chunk.get("duration", 0) / 10_000_000.0
-                    word_timings.append(
-                        WordTiming(
-                            word=word,
-                            start=round(offset_sec, 3),
-                            end=round(offset_sec + dur_sec, 3),
-                        )
-                    )
+    last_exc = None
+    for v_candidate in voices_to_try:
+        try:
+            communicate = edge_tts.Communicate(
+                clean_text,
+                v_candidate,
+                rate=rate,
+                pitch=pitch,
+                boundary="WordBoundary",
+            )
+            word_timings: list[WordTiming] = []
+            has_audio = False
 
-    logger.info("TTS saved to %s (voice=%s, words=%d)", output_path, voice, len(word_timings))
-    return word_timings
+            with open(output_path, "wb") as f:
+                async for chunk in communicate.stream():
+                    chunk_type = chunk.get("type")
+                    if chunk_type == "audio":
+                        data = chunk.get("data", b"")
+                        if data:
+                            f.write(data)
+                            has_audio = True
+                    elif chunk_type == "WordBoundary":
+                        word = chunk.get("text", "").strip()
+                        if word:
+                            offset_sec = chunk.get("offset", 0) / 10_000_000.0
+                            dur_sec = chunk.get("duration", 0) / 10_000_000.0
+                            word_timings.append(
+                                WordTiming(
+                                    word=word,
+                                    start=round(offset_sec, 3),
+                                    end=round(offset_sec + dur_sec, 3),
+                                )
+                            )
+            if has_audio and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                logger.info("TTS saved to %s (voice=%s, words=%d)", output_path, v_candidate, len(word_timings))
+                return word_timings
+        except Exception as exc:
+            last_exc = exc
+            logger.warning("Edge-TTS attempt with voice %s failed (%s) - trying fallback voice", v_candidate, exc)
+
+    if last_exc:
+        raise last_exc
+    return []
 
 
 async def _synthesise_elevenlabs(

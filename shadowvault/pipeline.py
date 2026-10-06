@@ -274,8 +274,8 @@ def main() -> None:
     parser.add_argument(
         "--length",
         choices=["short", "long"],
-        default="short",
-        help="Script length",
+        default="long",
+        help="Script length (default: long, 45-55s minidocumentary)",
     )
     parser.add_argument(
         "--privacy",

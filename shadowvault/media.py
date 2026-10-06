@@ -296,6 +296,7 @@ def fetch_scene_media(
 
     os.makedirs(temp_dir, exist_ok=True)
     query = scene.visual_query or "cinematic mystery"
+    critic_key = "fake-key" if (api_key and (api_key == "fake-key" or "mock" in api_key.lower() or api_key.startswith("test"))) else None
 
     # Explicit offline / mock test mode
     if api_key == "":
@@ -457,16 +458,26 @@ def fetch_scene_media(
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_wiki_{random.randint(1000, 9999)}.jpg")
             wiki_title = _fetch_wikimedia_archive_image(query, dest)
             if wiki_title:
-                return {
-                    "scene_id": scene.scene_id,
-                    "path": dest,
-                    "type": "image",
-                    "format": "photo",
-                    "source_desc": f"Wikimedia Commons Historical Evidence ('{wiki_title}')",
-                }
+                from shadowvault.vision_critic import verify_image_relevance
+                passed, score, reason = verify_image_relevance(dest, scene.narration, scene.visual_query, api_key=critic_key)
+                if passed:
+                    return {
+                        "scene_id": scene.scene_id,
+                        "path": dest,
+                        "type": "image",
+                        "format": "photo",
+                        "source_desc": f"Wikimedia Commons Historical Evidence ('{wiki_title}')",
+                    }
+                else:
+                    logger.info("Vision Critic rejected Wikimedia image %s (score=%d): %s", dest, score, reason)
+                    if os.path.exists(dest):
+                        try:
+                            os.remove(dest)
+                        except Exception:
+                            pass
 
     # 6. Custom 100% Unique AI Visual (Flux)
-    if vformat in {"ai_image", "auto"}:
+    if vformat in {"ai_image", "auto", "photo"}:
         try:
             from shadowvault.image_gen import generate_ai_image
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_ai_{random.randint(1000, 9999)}.jpg")
@@ -482,7 +493,7 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("AI image generation call failed: %s", exc)
 
-    # 7. High-Resolution Portrait Photography from Pexels
+    # 7. High-Resolution Portrait Photography from Pexels (Vision-Critic verified)
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
         search_queries = _extract_clean_search_terms(query, scene.narration)
 
@@ -490,19 +501,30 @@ def fetch_scene_media(
         for sq in search_queries:
             photos = _search_pexels_photos(sq, api_key)
             if photos:
-                pick_idx = (scene.scene_id - 1) % len(photos)
-                photo = photos[pick_idx]
-                photo_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("portrait")
-                if photo_url:
-                    dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
-                    if _download_video(photo_url, dest):
-                        return {
-                            "scene_id": scene.scene_id,
-                            "path": dest,
-                            "type": "image",
-                            "format": "photo",
-                            "source_desc": f"Pexels High-Res Photo (Query: '{sq}', Alt: '{photo.get('alt', '')[:50]}')",
-                        }
+                for cand_idx in range(min(len(photos), 3)):
+                    pick_idx = (scene.scene_id - 1 + cand_idx) % len(photos)
+                    photo = photos[pick_idx]
+                    photo_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("portrait")
+                    if photo_url:
+                        dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
+                        if _download_video(photo_url, dest):
+                            from shadowvault.vision_critic import verify_image_relevance
+                            passed, score, reason = verify_image_relevance(dest, scene.narration, scene.visual_query, api_key=critic_key)
+                            if passed:
+                                return {
+                                    "scene_id": scene.scene_id,
+                                    "path": dest,
+                                    "type": "image",
+                                    "format": "photo",
+                                    "source_desc": f"Pexels High-Res Photo (Query: '{sq}', Alt: '{photo.get('alt', '')[:50]}')",
+                                }
+                            else:
+                                logger.info("Vision Critic rejected Pexels photo %s (score=%d): %s", dest, score, reason)
+                                if os.path.exists(dest):
+                                    try:
+                                        os.remove(dest)
+                                    except Exception:
+                                        pass
 
         # 8. High-Resolution Video from Pexels
         for sq in search_queries:
@@ -557,6 +579,8 @@ def fetch_multi_scene_media(
             api_key = get_config().pexels_api_key
         except Exception:
             api_key = ""
+
+    critic_key = "fake-key" if (api_key and (api_key == "fake-key" or "mock" in api_key.lower() or api_key.startswith("test"))) else None
 
     # Offline / Mock test mode
     if not api_key or api_key == "fake-key" or api_key.startswith("test"):
@@ -663,11 +687,11 @@ def fetch_multi_scene_media(
                 primary_path = item["path"]
             continue
 
-        # For visual scenes: use character anchor series if available and suitable
+        # For visual scenes: use character anchor series if available, suitable, and verified
         used_series_item = False
         # Do not override custom AI images with stock photos unless an explicit continuous character/animal series is active
-        allow_series = (vformat in {"photo", "video", "auto"}) or any(
-            k in anchor_query.lower() for k in ["dog", "puppy", "cat", "car", "terrier", "athlete"]
+        allow_series = any(
+            k in anchor_query.lower() for k in ["dog", "puppy", "cat", "car", "terrier", "athlete", "supercar", "jet", "shuttle", "dancer"]
         )
         if allow_series and anchor_photos and series_idx < len(anchor_photos):
             photo = anchor_photos[series_idx]
@@ -675,22 +699,32 @@ def fetch_multi_scene_media(
             if photo_url:
                 dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_series_{photo.get('id')}.jpg")
                 if _download_video(photo_url, dest):
-                    series_idx += 1
-                    last_character_photo = dest
-                    alt_desc = (photo.get("alt") or "").strip()
-                    logger.info("Scene %d assigned from Character Series (%s - Photo %d)", scene.scene_id, anchor_photographer, series_idx)
-                    scenes_media.append({
-                        "scene_id": scene.scene_id,
-                        "path": dest,
-                        "type": "image",
-                        "format": "photo",
-                        "visual_format": "photo",
-                        "narration": scene.narration,
-                        "source_desc": f"Pexels Character Series ({anchor_photographer}, Subject: '{anchor_query}', Alt: '{alt_desc[:50]}')",
-                    })
-                    used_series_item = True
-                    if not primary_path:
-                        primary_path = dest
+                    from shadowvault.vision_critic import verify_image_relevance
+                    passed, score, reason = verify_image_relevance(dest, scene.narration, scene.visual_query, api_key=critic_key)
+                    if passed:
+                        series_idx += 1
+                        last_character_photo = dest
+                        alt_desc = (photo.get("alt") or "").strip()
+                        logger.info("Scene %d assigned from Character Series (%s - Photo %d, score=%d)", scene.scene_id, anchor_photographer, series_idx, score)
+                        scenes_media.append({
+                            "scene_id": scene.scene_id,
+                            "path": dest,
+                            "type": "image",
+                            "format": "photo",
+                            "visual_format": "photo",
+                            "narration": scene.narration,
+                            "source_desc": f"Pexels Character Series ({anchor_photographer}, Subject: '{anchor_query}', Alt: '{alt_desc[:50]}')",
+                        })
+                        used_series_item = True
+                        if not primary_path:
+                            primary_path = dest
+                    else:
+                        logger.info("Vision Critic rejected Character Series photo for scene %d (score=%d): %s", scene.scene_id, score, reason)
+                        if os.path.exists(dest):
+                            try:
+                                os.remove(dest)
+                            except Exception:
+                                pass
 
         if not used_series_item:
             # Fall back to standard scene-specific search

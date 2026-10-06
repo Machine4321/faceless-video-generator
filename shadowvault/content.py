@@ -303,19 +303,32 @@ def _pick_hook(niche: str) -> str:
 def _build_prompt(niche: str, hook: str, length: str = "short") -> str:
     cfg = NICHE_CONFIG.get(niche, NICHE_CONFIG[DEFAULT_NICHE])
     word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
+    is_long = length == "long"
+    target_dur = "~45-55 seconds spoken" if is_long else "~22-26 seconds spoken"
+    num_scenes = "13 to 17" if is_long else "8 to 11"
+
+    arc_instruction = (
+        "4-ACT DOCUMENTARY NARRATIVE ARC:\n"
+        "   - Act 1 (Hook & Impossible Stakes, scenes 1-3): Cold open fact, impenetrable setting.\n"
+        "   - Act 2 (The Tactical Flaw & Quantifiable Stakes, scenes 4-7): The secret vulnerability and record numbers (use 'counter' scene with exact value).\n"
+        "   - Act 3 (The Second-by-Second Execution, scenes 8-12): Tension-filled execution, alarms bypassed, loot seized (use 'dossier' or 'ai_image').\n"
+        "   - Act 4 (The Shocking Climax & Loop, scenes 13-16): Breaking front page ('newspaper'), chilling revelation/clue, and loop back to the opening hook."
+        if is_long else
+        "FAST 2-ACT RHYTHM:\n"
+        "   - In-media-res pacing (no slow introductions or filler).\n"
+        "   - Build relentless tension and end with a chilling twist or seamless loop back to the hook."
+    )
 
     return f"""\
 {cfg['style']}
 
 TASK:
 1. Write a viral short-form investigative script that starts with: "{hook}"
-   Target total length: ~{word_count} words (~22-26 seconds spoken).
+   Target total length: ~{word_count} words ({target_dur}).
    RETENTION & STORY RULES:
    - First sentence is the explosive hook (already given).
-   - In-media-res pacing (no slow introductions or filler).
-   - Build relentless tension and curiosity with every sentence.
-   - End with a chilling revelation or a seamless loop back to the hook.
-   - DOUBLE THE VISUAL RHYTHM: Divide the story into 8 to 11 sequential micro-scenes (each cut 4-8 words, ~1.8-2.2 seconds).
+   {arc_instruction}
+   - DOUBLE THE VISUAL RHYTHM: Divide the story into {num_scenes} sequential micro-scenes (each cut 4-8 words, ~1.8-2.5 seconds).
    - Use high-contrast documentary formats across scenes: "ai_image", "radar", "dossier", "counter", "newspaper".
    - NO generic stock actors or AI clichés.
 
@@ -350,6 +363,22 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 
 def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
     word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
+    is_long = length == "long"
+    target_dur = "~45-55 seconds spoken" if is_long else "~22-26 seconds spoken"
+    num_scenes = "13 to 17" if is_long else "8 to 11"
+
+    arc_instruction = (
+        "4-ACT DOCUMENTARY NARRATIVE ARC:\n"
+        "   - Act 1 (Hook & Impossible Stakes, scenes 1-3): Cold open fact, impenetrable setting.\n"
+        "   - Act 2 (The Tactical Flaw & Quantifiable Stakes, scenes 4-7): The secret vulnerability and record numbers (use 'counter' scene with exact value).\n"
+        "   - Act 3 (The Second-by-Second Execution, scenes 8-12): Tension-filled execution, alarms bypassed, loot seized (use 'dossier' or 'ai_image').\n"
+        "   - Act 4 (The Shocking Climax & Loop, scenes 13-16): Breaking front page ('newspaper'), chilling revelation/clue, and loop back to the opening hook."
+        if is_long else
+        "FAST 2-ACT RHYTHM:\n"
+        "   - In-media-res pacing (no slow introductions or filler).\n"
+        "   - Build relentless tension and end with a chilling twist or seamless loop back to the hook."
+    )
+
     return f"""\
 You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris, Lemmino level).
 Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all generic AI fluff and structure every single second with rapid visual cuts and verifiable facts.
@@ -364,21 +393,22 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
 2. CRITICAL TOPIC RELEVANCE & VISUAL SYNCHRONIZATION:
    - The topic is: "{topic}". EVERY SINGLE SCENE must directly portray and describe this specific subject.
    - Do NOT hallucinate dark crime archives, space telescopes, or laboratories unless the topic is literally about space or laboratories!
-   - If the topic is about an animal, dance, sport, music, or event (e.g. "{topic}"), EVERY visual query MUST explicitly focus on that physical subject (e.g. canine dancer, salsa dancing dog, dancing paws, trainer on stage, crowd applause).
+   - If the topic is about an animal, dance, sport, music, or event (e.g. "{topic}"), EVERY visual query MUST explicitly focus on that physical subject.
    - Format selection rules:
      * "ai_image": Ultra-detailed cinematic photograph depicting the exact action of {topic}.
      * "photo": Archival or high-resolution photography of {topic}.
      * "video": Motion footage of {topic}.
-     * "counter": Use when narrating a quantifiable metric or record. CRITICAL: When visual_format is "counter", the narration MUST speak the exact number and unit (e.g. "180 beats per minute", "50 million views", "99 percent synchronization", "first place 100 points").
+     * "counter": Use when narrating a quantifiable metric or record. CRITICAL: When visual_format is "counter", the narration MUST speak the exact number and unit (e.g. "$500 million", "180 beats per minute", "13 masterpieces", "81 minutes").
      * "newspaper": Use for breaking news, competition headline, or public sensation about {topic}.
      * "dossier": ONLY if {topic} involves classified intelligence or crime. Otherwise use "ai_image" or "photo".
      * "radar": ONLY if {topic} involves radio frequencies, astronomy, or radar telemetry. Otherwise use "ai_image" or "photo".
-3. DOUBLED VISUAL RHYTHM (8 to 11 FAST-PACED MICRO-SCENES):
-   - Modern viewers drop off if a scene holds longer than 2.2 seconds.
-   - Break the script into 8 to 11 sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.2 seconds).
+3. DOUBLED VISUAL RHYTHM ({num_scenes} FAST-PACED MICRO-SCENES):
+   - Modern viewers drop off if a scene holds longer than 2.5 seconds.
+   - Break the script into {num_scenes} sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.5 seconds).
 4. RELENTLESS PACING & SEAMLESS LOOP:
-   - Total narration: ~{word_count} words (~22-26 seconds).
+   - Total narration: ~{word_count} words ({target_dur}).
    - The cold open starts immediately in-media-res with an unbelievable recorded fact.
+   {arc_instruction}
    - The final sentence delivers a bone-chilling twist or connects back seamlessly to the first sentence for infinite loop retention.
 5. TRUE CRIME & HEISTS MANDATE (WHEN TOPIC INVOLVES HEISTS, ROBBERIES, THEFT, ART, OR INVESTIGATIONS):
    - ZERO ABSTRACT FLUFF: Never talk about generic museum security procedures, guard checklists, or abstract statistics.
