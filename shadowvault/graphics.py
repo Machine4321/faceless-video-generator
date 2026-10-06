@@ -21,7 +21,7 @@ from typing import Optional
 
 import imageio
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,7 @@ def render_newspaper_frame(
     if has_photo:
         try:
             p_img = Image.open(photo_path).convert("RGB")
-            p_img = p_img.resize((430, 310))
+            p_img = ImageOps.fit(p_img, (430, 310), method=Image.Resampling.LANCZOS, centering=(0.5, 0.4))
             sheet.paste(p_img, (55, curr_y))
             draw.rectangle([55, curr_y, 55 + 430, curr_y + 310], outline=(40, 40, 40), width=2)
             cap_text = caption or "PHOTO ARCHIVE: Subject documented during record-setting performance."
@@ -488,10 +488,14 @@ def _categorize_stat(num: int, prefix: str, suffix: str, text: str) -> tuple[int
         label = "GLOBAL VIRAL AUDIENCE"
     elif "debris" in text_l or "dust" in text_l or suffix == "TONS":
         label = "ANNUAL SPACE DEBRIS"
-    elif "layer" in text_l or suffix == "LAYERS":
-        label = "VAULT SECURITY PROTOCOLS"
-    elif "stolen" in text_l or "heist" in text_l:
+    elif any(w in text_l for w in ["masterpiece", "artwork", "painting", "canvas"]):
+        label = "STOLEN MASTERPIECES"
+        if not suffix and num < 1000:
+            suffix = "WORKS"
+    elif ("stolen" in text_l or "heist" in text_l) and (prefix == "$" or "dollar" in text_l or "worth" in text_l or "valuation" in text_l):
         label = "STOLEN VALUATION"
+    elif "stolen" in text_l or "heist" in text_l:
+        label = "CONFIRMED STOLEN ASSETS"
     elif "dollar" in text_l or prefix == "$":
         label = "FINANCIAL RECORD"
     elif "mhz" in text_l or suffix == "MHZ":

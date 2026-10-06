@@ -380,12 +380,21 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
    - Total narration: ~{word_count} words (~22-26 seconds).
    - The cold open starts immediately in-media-res with an unbelievable recorded fact.
    - The final sentence delivers a bone-chilling twist or connects back seamlessly to the first sentence for infinite loop retention.
+5. TRUE CRIME & HEISTS MANDATE (WHEN TOPIC INVOLVES HEISTS, ROBBERIES, THEFT, ART, OR INVESTIGATIONS):
+   - ZERO ABSTRACT FLUFF: Never talk about generic museum security procedures, guard checklists, or abstract statistics.
+   - GROUND IMMEDIATELY IN A LEGENDARY SPECIFIC CASE:
+     * For art heists: Anchor immediately on the $500,000,000 Isabella Stewart Gardner Museum heist in Boston (two thieves disguised as police officers walked in at 1:24 AM, handcuffed guards with duct tape in the basement, cut 13 priceless masterpieces including Rembrandt and Vermeer out of their gilded frames in 81 minutes, and vanished forever; for 34 years the empty frames still hang on the gallery walls, and a $10M FBI bounty remains unclaimed).
+     * Reveal the dark underworld secret: high-profile masterpieces can NEVER be sold on the open market—they become shadow underworld currency and collateral traded between international drug cartels and syndicates.
+   - MANDATORY EXACT NUMBERS IN COUNTER SCENE: If using "counter", state the exact dollar value (e.g. "$500 million", "$100 million") or exact count (e.g. "13 masterpieces stolen", "81 minutes").
+6. PHYSICAL NOUNS FOR VISUAL QUERIES (CRITICAL):
+   - "visual_search" and EVERY "visual_query" MUST consist of CONCRETE, PHYSICAL NOUNS (e.g. "art museum gallery", "framed classical oil painting", "empty picture frame hanging on museum wall", "bank vault steel door", "police investigation tape", "museum security camera").
+   - NEVER use abstract adjectives or journalistic buzzwords: "high-profile", "highprofile", "uptick", "shocking", "unbelievable", "mysterious", "secret", "crisis". Search engines cannot search abstract adjectives and will return fashion models or curtains. ONLY use concrete physical nouns!
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
   "title": "ALL-CAPS VIRAL THRILLER TITLE",
   "script": "Full narrative script...",
-  "visual_search": "primary subject keyword directly describing {topic}",
+  "visual_search": "primary concrete physical subject noun directly describing {topic}",
   "tags": "#shorts #trending #viral #mystery",
   "scenes": [
     {{
@@ -491,8 +500,14 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
     title = clean_text(data["title"])
     script = clean_text(data["script"])
     raw_kw = clean_text(data["visual_search"])
-    stop_words = {"the", "a", "an", "this", "that", "these", "those", "is", "are", "was", "were", "of", "in", "on", "at", "to", "for", "with", "by", "from"}
-    candidate_words = [w for w in re.sub(r"[^\w\s]", "", raw_kw).split() if w.lower() not in stop_words]
+    stop_and_jargon = {
+        "the", "a", "an", "this", "that", "these", "those", "is", "are", "was", "were",
+        "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or",
+        "highprofile", "high-profile", "high", "profile", "uptick", "crisis", "shocking",
+        "unbelievable", "mysterious", "secret", "truth", "viral", "why", "heres", "there",
+        "has", "been", "yes", "no", "overview", "look", "report", "news", "trend", "trending"
+    }
+    candidate_words = [w for w in re.sub(r"[^\w\s]", "", raw_kw).split() if w.lower() not in stop_and_jargon]
     visual_search = candidate_words[0] if candidate_words else (raw_kw.split()[0] if raw_kw.split() else "viral")
     tags = clean_text(data["tags"])
 
@@ -502,11 +517,14 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
     if isinstance(raw_scenes, list) and len(raw_scenes) >= 2:
         for idx, item in enumerate(raw_scenes, start=1):
             if isinstance(item, dict) and "narration" in item:
+                vq = clean_text(item.get("visual_query", visual_search))
+                vq_words = [w for w in re.sub(r"[^\w\s]", "", vq).split() if w.lower() not in stop_and_jargon]
+                final_vq = " ".join(vq_words) if vq_words else visual_search
                 scenes.append(
                     ScenePlan(
                         scene_id=item.get("scene_id", idx),
                         narration=clean_text(item["narration"]),
-                        visual_query=clean_text(item.get("visual_query", visual_search)),
+                        visual_query=final_vq,
                         sfx_cue=item.get("sfx_cue") or ("whoosh" if idx > 1 else "impact"),
                         visual_format=item.get("visual_format", "auto"),
                     )

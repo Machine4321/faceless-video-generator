@@ -96,11 +96,21 @@ async def run_once(
         logger.info("[2/5] Sourcing visual media ...")
         if getattr(run.content, "scenes", None) and len(run.content.scenes) > 1:
             primary = run.content.visual_search_keyword
-            if chosen_topic and isinstance(chosen_topic, str):
-                stop_words = {"the", "a", "an", "that", "this", "these", "those", "and", "or", "in", "on", "at", "to", "for", "of", "with"}
-                topic_words = [w for w in re.sub(r"[^\w\s]", "", chosen_topic).split() if w.lower() not in stop_words]
-                if topic_words:
+            if chosen_topic:
+                topic_str = chosen_topic.title if hasattr(chosen_topic, "title") else str(chosen_topic)
+                stop_and_jargon = {
+                    "the", "a", "an", "that", "this", "these", "those", "and", "or", "in", "on", "at",
+                    "to", "for", "of", "with", "by", "from", "yes", "no", "heres", "why", "there",
+                    "has", "been", "an", "uptick", "high", "profile", "highprofile", "shocking",
+                    "look", "other", "famous", "what", "did", "top", "biggest", "after"
+                }
+                topic_words = [w for w in re.sub(r"[^\w\s]", "", topic_str).split() if w.lower() not in stop_and_jargon]
+                if len(topic_words) >= 2:
                     primary = " ".join(topic_words[:2])
+                elif topic_words:
+                    primary = topic_words[0]
+            if niche == "heists" and primary.lower() in {"art", "heist", "heists", "art heists"}:
+                primary = "art museum gallery"
             run.media = media_stage.fetch_multi_scene_media(
                 run.content.scenes,
                 primary_query=primary,

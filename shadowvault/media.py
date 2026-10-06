@@ -152,7 +152,7 @@ def _fetch_nasa_archive_image(query: str, dest_path: str) -> Optional[str]:
 def _fetch_wikimedia_archive_image(query: str, dest_path: str) -> Optional[str]:
     """Fetch authentic public-domain historical evidence/photo from Wikimedia Commons."""
     try:
-        clean_terms = [w for w in re.findall(r"\b[A-Za-z]{3,}\b", query) if w.lower() not in {"dark", "eerie", "shot", "view", "wide", "photograph", "macro"}]
+        clean_terms = [w for w in re.findall(r"\b[A-Za-z]{4,}\b", query) if w.lower() not in {"dark", "eerie", "shot", "view", "wide", "photograph", "macro", "close", "scene", "room", "vintage", "archival"}]
         search_term = " ".join(clean_terms[:3]) if clean_terms else query
         url = (
             f"https://en.wikipedia.org/w/api.php"
@@ -167,9 +167,9 @@ def _fetch_wikimedia_archive_image(query: str, dest_path: str) -> Optional[str]:
             sorted_pages = sorted(pages.values(), key=lambda x: x.get("index", 999))
             for p in sorted_pages:
                 page_title = p.get("title", "").lower()
-                # Ensure the page title is genuinely relevant to the search query
+                # Ensure the page title genuinely matches the key search terms with whole-word boundaries
                 if clean_terms:
-                    matches = [term.lower() in page_title for term in clean_terms]
+                    matches = [bool(re.search(rf"\b{re.escape(term.lower())}\b", page_title)) for term in clean_terms]
                     if not any(matches):
                         continue
                 thumb = p.get("thumbnail", {}).get("source")
@@ -241,7 +241,12 @@ def _extract_clean_search_terms(query: str, narration: str = "") -> list[str]:
         "up", "look", "looking", "capture", "capturing", "perspective", "a", "an",
         "the", "of", "in", "on", "at", "to", "by", "from", "as", "into", "is", "it",
         "he", "she", "they", "was", "were", "this", "that", "him", "her", "his",
-        "with", "and", "for", "showing", "featuring", "under", "about", "could", "would"
+        "with", "and", "for", "showing", "featuring", "under", "about", "could", "would",
+        # Abstract journalistic buzzwords and adjectives that break stock media retrieval:
+        "highprofile", "high-profile", "high", "profile", "uptick", "crisis", "shocking",
+        "unbelievable", "mysterious", "secret", "truth", "viral", "epic", "insane",
+        "crazy", "bizarre", "real", "why", "heres", "there", "has", "been", "yes", "no",
+        "overview", "look", "report", "news", "trend", "trending"
     }
 
     q_words = [w for w in re.findall(r"\b[A-Za-z0-9'-]+\b", query) if w.lower() not in camera_noise]
@@ -446,9 +451,9 @@ def fetch_scene_media(
                     "source_desc": f"NASA Official Archive Photograph ('{nasa_title}')",
                 }
 
-        # Check Wikimedia Commons for historical cases/heists/crimes/dossiers
-        history_keywords = ["heist", "fbi", "cia", "vault", "diamond", "robbery", "stole", "investigation", "case", "signal", "wow", "plague", "conspiracy", "secret", "archive"]
-        if any(w in query.lower() or w in text_lower for w in history_keywords):
+        # Check Wikimedia Commons ONLY for verified specific historical entities/cases
+        history_entities = ["gardner museum", "isabella stewart", "rembrandt", "vermeer", "mona lisa", "green vault", "antwerp diamond", "wow signal", "dancing plague", "operation midnight climax", "mk ultra"]
+        if any(w in query.lower() or w in text_lower for w in history_entities):
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_wiki_{random.randint(1000, 9999)}.jpg")
             wiki_title = _fetch_wikimedia_archive_image(query, dest)
             if wiki_title:
@@ -583,7 +588,11 @@ def fetch_multi_scene_media(
         "beagle", "rottweiler", "pitbull", "boxer", "dachshund", "shiba inu", "pug",
         "dog dancing", "dancing dog", "salsa dog", "dog", "puppy", "dogs",
         "tabby cat", "persian cat", "siamese cat", "black cat", "cat", "kitten",
-        "formula 1 car", "supercar", "sports car", "fighter jet", "space shuttle"
+        "formula 1 car", "supercar", "sports car", "fighter jet", "space shuttle",
+        # Settings, Art & Crime physical subjects
+        "art museum gallery", "art museum", "museum gallery", "art gallery", "museum vault",
+        "bank vault", "diamond vault", "framed oil painting", "framed painting", "oil painting",
+        "security camera cctv", "empty picture frame",
     ]
     all_text = " ".join([primary_query or ""] + [f"{sc.visual_query} {sc.narration}" for sc in scenes]).lower()
     for ds in known_distinct_subjects:
@@ -606,6 +615,9 @@ def fetch_multi_scene_media(
     # Search Pexels to locate a photographer with a multi-shot series
     from collections import Counter
     for cand_q in candidates[:6]:
+        # Expand single-word ambiguous art terms to concrete gallery searches
+        if cand_q.lower() == "art":
+            cand_q = "art museum gallery"
         photos = _search_pexels_photos(cand_q, api_key)
         if not photos:
             continue
@@ -651,9 +663,13 @@ def fetch_multi_scene_media(
                 primary_path = item["path"]
             continue
 
-        # For visual scenes: use character anchor series if available
+        # For visual scenes: use character anchor series if available and suitable
         used_series_item = False
-        if anchor_photos and series_idx < len(anchor_photos):
+        # Do not override custom AI images with stock photos unless an explicit continuous character/animal series is active
+        allow_series = (vformat in {"photo", "video", "auto"}) or any(
+            k in anchor_query.lower() for k in ["dog", "puppy", "cat", "car", "terrier", "athlete"]
+        )
+        if allow_series and anchor_photos and series_idx < len(anchor_photos):
             photo = anchor_photos[series_idx]
             photo_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("portrait") or photo.get("src", {}).get("original")
             if photo_url:
