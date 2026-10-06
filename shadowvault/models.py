@@ -92,6 +92,9 @@ class TrendingTopic:
     search_volume: str = ""
     suggested_niche: str = "facts"  # "facts", "glitches", "heists", "business", "horror"
     keywords: list[str] = field(default_factory=list)
+    source_url: str = ""
+    source_name: str = ""
+    published_date: str = ""
 
 
 @dataclass
@@ -105,5 +108,7 @@ class PipelineRun:
     audio: Optional[AudioResult] = None
     video: Optional[VideoResult] = None
     upload: Optional[UploadResult] = None
+    metadata_path: str = ""
     temp_files: list[str] = field(default_factory=list)
+
 

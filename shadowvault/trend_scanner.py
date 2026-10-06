@@ -225,6 +225,84 @@ def scan_wikipedia_on_this_day(max_items: int = 5) -> list[TrendingTopic]:
         return []
 
 
+NICHE_NEWS_QUERIES: dict[str, str] = {
+    "glitches": "(unexplained+signal+OR+ocean+anomaly+OR+cosmic+mystery)+when:30d",
+    "heists": "vault+heist+OR+stolen+millions+OR+art+theft+when:30d",
+    "dark_psychology": "declassified+files+OR+cia+secret+OR+fbi+mystery+when:30d",
+    "horror": "unsolved+mystery+discovery+OR+cold+case+when:30d",
+    "business": "corporate+scandal+OR+billionaire+battle+when:30d",
+    "facts": "deep+space+discovery+OR+quantum+breakthrough+when:30d",
+}
+
+
+def scan_niche_news(
+    niche: str,
+    query: Optional[str] = None,
+    max_items: int = 8,
+) -> list[TrendingTopic]:
+    """
+    Fetch breaking, non-recycled news stories for a specific niche from Google News RSS.
+    Returns list of TrendingTopic objects with direct URLs, publishers, and publication dates.
+    """
+    search_q = query or NICHE_NEWS_QUERIES.get(niche, NICHE_NEWS_QUERIES["glitches"])
+    url = f"https://news.google.com/rss/search?q={search_q}&hl=en-US&gl=US&ceid=US:en"
+    try:
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=DEFAULT_TIMEOUT)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.content)
+        items = root.findall(".//item")
+        topics: list[TrendingTopic] = []
+
+        for item in items[:max_items]:
+            raw_title = item.find("title").text if item.find("title") is not None else ""
+            if not raw_title:
+                continue
+            clean_title = html.unescape(raw_title)
+            # Remove publisher suffix e.g. " - BBC Sky at Night Magazine"
+            clean_title = re.sub(r"\s*-\s*[^-]+$", "", clean_title).strip()
+
+            # Skip banned sports/celebrity keywords
+            if any(banned in clean_title.lower() for banned in BANNED_TOPIC_KEYWORDS):
+                continue
+
+            link_el = item.find("link")
+            source_url = link_el.text.strip() if link_el is not None and link_el.text else ""
+
+            source_el = item.find("source")
+            source_name = source_el.text.strip() if source_el is not None and source_el.text else "News"
+
+            pub_el = item.find("pubDate")
+            pub_date = pub_el.text.strip() if pub_el is not None and pub_el.text else ""
+
+            desc_el = item.find("description")
+            raw_desc = desc_el.text if desc_el is not None and desc_el.text else ""
+            clean_desc = html.unescape(raw_desc)
+            clean_desc = re.sub(r"<[^>]+>", " ", clean_desc).strip()
+            summary = clean_desc if clean_desc else clean_title
+
+            keywords = [w.lower() for w in re.findall(r"\b[A-Za-z]{4,}\b", clean_title)][:5]
+
+            topics.append(
+                TrendingTopic(
+                    title=clean_title,
+                    summary=summary,
+                    source="google_news",
+                    source_name=source_name,
+                    source_url=source_url,
+                    published_date=pub_date,
+                    search_volume="Breaking News",
+                    suggested_niche=niche,
+                    keywords=keywords,
+                )
+            )
+
+        logger.info("Scanned %d real-time breaking topics from Google News RSS for niche '%s'", len(topics), niche)
+        return topics
+    except Exception as exc:
+        logger.warning("Google News niche scan failed for '%s': %s", niche, exc)
+        return []
+
+
 def get_hottest_viral_topic(
     preferred_niche: Optional[str] = None,
     allow_fallbacks: bool = True,
@@ -233,17 +311,31 @@ def get_hottest_viral_topic(
     Discover the best single viral topic for today's video.
     Combines live Google Trends with historical shockers, matching preferred niche if given.
     """
+    # 1. If a preferred niche is specified, check live breaking news first!
+    if preferred_niche:
+        niche_news = scan_niche_news(preferred_niche, max_items=8)
+        if niche_news:
+            chosen = random.choice(niche_news[:min(4, len(niche_news))])
+            logger.info(
+                "Selected breaking niche news topic: %r [%s] from %s (%s)",
+                chosen.title,
+                chosen.suggested_niche,
+                chosen.source_name,
+                chosen.source_url[:50] + "...",
+            )
+            return chosen
+
     candidates: list[TrendingTopic] = []
 
-    # 1. Fetch Google Trends
+    # 2. Fetch Google Trends
     gt_topics = scan_google_trends(geo="US", max_items=12)
     candidates.extend(gt_topics)
 
-    # 2. Fetch Wikipedia historical drama
+    # 3. Fetch Wikipedia historical drama
     wiki_topics = scan_wikipedia_on_this_day(max_items=5)
     candidates.extend(wiki_topics)
 
-    # 3. Filter by preferred niche if specified
+    # 4. Filter by preferred niche if specified
     if preferred_niche:
         niche_matches = [t for t in candidates if t.suggested_niche == preferred_niche]
         if niche_matches:

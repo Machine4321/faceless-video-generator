@@ -178,7 +178,13 @@ def fetch_scene_media(
     if api_key == "":
         dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
         _create_procedural_backdrop(scene.scene_id, dest)
-        return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        return {
+            "scene_id": scene.scene_id,
+            "path": dest,
+            "type": "image",
+            "format": "procedural",
+            "source_desc": "Procedural Dark Cinema Backdrop (Pillow)",
+        }
 
     import re
     vformat = getattr(scene, "visual_format", "auto")
@@ -202,7 +208,13 @@ def fetch_scene_media(
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_news_{random.randint(1000, 9999)}.jpg")
             render_newspaper_frame(headline=scene.narration, dest_path=dest)
             logger.info("Generated Vox-style newspaper graphic for scene %d", scene.scene_id)
-            return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "newspaper"}
+            return {
+                "scene_id": scene.scene_id,
+                "path": dest,
+                "type": "image",
+                "format": "newspaper",
+                "source_desc": f"Procedural Archival Newspaper (Pillow 3D Desk, Headline: '{scene.narration[:60]}...')",
+            }
         except Exception as exc:
             logger.warning("Newspaper graphic generation failed: %s", exc)
 
@@ -213,7 +225,13 @@ def fetch_scene_media(
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_dossier_{random.randint(1000, 9999)}.jpg")
             render_classified_dossier(title=scene.visual_query, body_text=scene.narration, dest_path=dest)
             logger.info("Generated classified FBI dossier for scene %d", scene.scene_id)
-            return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "dossier"}
+            return {
+                "scene_id": scene.scene_id,
+                "path": dest,
+                "type": "image",
+                "format": "dossier",
+                "source_desc": f"Procedural Classified Dossier (Pillow 3D Desk, Stamp: TOP SECRET, Query: '{scene.visual_query}')",
+            }
         except Exception as exc:
             logger.warning("Classified dossier generation failed: %s", exc)
 
@@ -226,7 +244,13 @@ def fetch_scene_media(
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.jpg")
             render_stat_counter_card(stat_value=stat_val, stat_label="DOCUMENTED RECORD", dest_path=dest)
             logger.info("Generated stat counter card for scene %d (%s)", scene.scene_id, stat_val)
-            return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "counter"}
+            return {
+                "scene_id": scene.scene_id,
+                "path": dest,
+                "type": "image",
+                "format": "counter",
+                "source_desc": f"Procedural Document Stat Card (Pillow 3D Desk, Value: {stat_val})",
+            }
         except Exception as exc:
             logger.warning("Stat counter generation failed: %s", exc)
 
@@ -236,7 +260,14 @@ def fetch_scene_media(
             from shadowvault.image_gen import generate_ai_image
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_ai_{random.randint(1000, 9999)}.jpg")
             if generate_ai_image(prompt=scene.visual_query, dest_path=dest):
-                return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "ai_image"}
+                return {
+                    "scene_id": scene.scene_id,
+                    "path": dest,
+                    "type": "image",
+                    "format": "ai_image",
+                    "prompt": scene.visual_query,
+                    "source_desc": f"Pollinations Flux AI Image (Prompt: '{scene.visual_query}')",
+                }
         except Exception as exc:
             logger.warning("AI image generation call failed: %s", exc)
 
@@ -255,7 +286,13 @@ def fetch_scene_media(
                 if best_link:
                     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.mp4")
                     if _download_video(best_link, dest):
-                        return {"scene_id": scene.scene_id, "path": dest, "type": "video", "format": "video"}
+                        return {
+                            "scene_id": scene.scene_id,
+                            "path": dest,
+                            "type": "video",
+                            "format": "video",
+                            "source_desc": f"Pexels Stock Footage (Query: '{sq}', URL: {best_link[:60]}...)",
+                        }
 
         # 6. Pexels Photo (portrait high-res for Ken Burns)
         for sq in search_queries:
@@ -265,12 +302,24 @@ def fetch_scene_media(
                 if photo_url:
                     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_{random.randint(1000, 9999)}.jpg")
                     if _download_video(photo_url, dest):
-                        return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "photo"}
+                        return {
+                            "scene_id": scene.scene_id,
+                            "path": dest,
+                            "type": "image",
+                            "format": "photo",
+                            "source_desc": f"Pexels High-Res Photo (Query: '{sq}')",
+                        }
 
     # 7. Procedural cinematic backdrop fallback (only when completely offline or all APIs fail)
     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
     _create_procedural_backdrop(scene.scene_id, dest)
-    return {"scene_id": scene.scene_id, "path": dest, "type": "image", "format": "procedural"}
+    return {
+        "scene_id": scene.scene_id,
+        "path": dest,
+        "type": "image",
+        "format": "procedural",
+        "source_desc": "Procedural Dark Cinema Backdrop (Pillow Fallback)",
+    }
 
 
 def fetch_multi_scene_media(

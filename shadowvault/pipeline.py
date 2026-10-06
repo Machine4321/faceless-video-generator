@@ -150,6 +150,20 @@ async def run_once(
         else:
             logger.info("[5/5] Skipped (--no-upload) | video at %s", run.video.video_path)
 
+        # Stage 6: Metadata and Provenance Report
+        try:
+            from shadowvault.config import get_config
+            out_dir = get_config().output_dir
+        except Exception:
+            out_dir = "output"
+
+        try:
+            from shadowvault.metadata import write_metadata_file, print_metadata_summary
+            write_metadata_file(run, output_dir=out_dir)
+            print_metadata_summary(run)
+        except Exception as meta_exc:
+            logger.warning("Failed to generate metadata report file: %s", meta_exc)
+
     except Exception as exc:
         logger.error("Pipeline run #%d failed: %s", run_id, exc, exc_info=True)
 
@@ -372,6 +386,8 @@ def main() -> None:
             print(f"Title    : {result.content.title}")
         if result.video:
             print(f"Video    : {result.video.video_path}")
+        if result.metadata_path:
+            print(f"Metadata : {result.metadata_path}")
         if result.upload:
             if result.upload.success:
                 print(f"YouTube  : {result.upload.youtube_url}")

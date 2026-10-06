@@ -100,9 +100,11 @@ def test_scan_wikipedia_on_this_day_success(mock_get):
     assert topics[0].source == "wikipedia"
 
 
+@patch("shadowvault.trend_scanner.scan_niche_news")
 @patch("shadowvault.trend_scanner.scan_google_trends")
 @patch("shadowvault.trend_scanner.scan_wikipedia_on_this_day")
-def test_get_hottest_viral_topic_with_preference(mock_wiki, mock_gt):
+def test_get_hottest_viral_topic_with_preference(mock_wiki, mock_gt, mock_niche):
+    mock_niche.return_value = []
     mock_gt.return_value = [
         TrendingTopic(
             title="Massive Diamond Robbery",
@@ -124,9 +126,11 @@ def test_get_hottest_viral_topic_with_preference(mock_wiki, mock_gt):
     assert topic.title == "Massive Diamond Robbery"
 
 
+@patch("shadowvault.trend_scanner.scan_niche_news")
 @patch("shadowvault.trend_scanner.scan_google_trends")
 @patch("shadowvault.trend_scanner.scan_wikipedia_on_this_day")
-def test_get_hottest_viral_topic_fallback_when_offline(mock_wiki, mock_gt):
+def test_get_hottest_viral_topic_fallback_when_offline(mock_wiki, mock_gt, mock_niche):
+    mock_niche.return_value = []
     mock_gt.return_value = []
     mock_wiki.return_value = []
 
