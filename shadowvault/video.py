@@ -94,6 +94,29 @@ EMOJI_KEYWORDS: dict[str, str] = {
     "night": "🌙",
     "ocean": "🌊",
     "space": "🚀",
+    "dog": "🐾",
+    "dogs": "🐾",
+    "canine": "🐾",
+    "puppy": "🐶",
+    "paws": "🐾",
+    "paw": "🐾",
+    "terrier": "🐾",
+    "dance": "💃",
+    "dancing": "💃",
+    "salsa": "💃",
+    "music": "🎵",
+    "tempo": "⏱️",
+    "bpm": "⏱️",
+    "points": "🏆",
+    "point": "🏆",
+    "trophy": "🏆",
+    "record": "📜",
+    "viral": "🔥",
+    "stage": "🎭",
+    "champion": "🥇",
+    "winner": "🥇",
+    "internet": "🌐",
+    "routine": "✨",
 }
 
 
@@ -158,13 +181,15 @@ def _render_kinetic_chunk_frame(
     img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = _load_font(font_size, bold=True)
+    active_font = _load_font(int(font_size * 1.10), bold=True)
     emoji = _detect_emoji(words_in_chunk)
 
-    # Measure each word and spacing
+    # Measure each word and spacing (active word uses active_font)
     space_w = font_size // 3
     word_widths = []
-    for w in words_in_chunk:
-        bbox = draw.textbbox((0, 0), w.upper(), font=font, stroke_width=stroke_width)
+    for idx, w in enumerate(words_in_chunk):
+        f = active_font if idx == active_idx else font
+        bbox = draw.textbbox((0, 0), w.upper(), font=f, stroke_width=stroke_width)
         word_widths.append(bbox[2] - bbox[0])
 
     total_w = sum(word_widths) + space_w * (len(words_in_chunk) - 1)
@@ -188,25 +213,27 @@ def _render_kinetic_chunk_frame(
                 pass
 
     # Stylish translucent rounded pill behind the chunk to guarantee 100% contrast on any background
-    pad_x, pad_y = 26, 14
+    pad_x, pad_y = 28, 16
     pill_x0 = start_x - pad_x
     pill_y0 = base_y - font_size // 2 - pad_y
     pill_x1 = start_x + total_w + pad_x
     pill_y1 = base_y + font_size // 2 + pad_y
-    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=18, fill=(0, 0, 0, 160))
+    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=20, fill=(0, 0, 0, 160))
 
-    # Draw Words horizontally with drop shadow
+    # Draw Words horizontally with drop shadow & active bounce pop
     curr_x = start_x
     for idx, (word, w_w) in enumerate(zip(words_in_chunk, word_widths)):
         is_active = (idx == active_idx)
         color = active_color if is_active else inactive_color
         s_width = stroke_width + (2 if is_active else 0)
+        f = active_font if is_active else font
+        word_y = base_y - 4 if is_active else base_y
 
         # Subtle dark drop-shadow behind word
         draw.text(
-            (curr_x + 3, base_y + 4),
+            (curr_x + 3, word_y + 4),
             word.upper(),
-            font=font,
+            font=f,
             fill=(0, 0, 0, 180),
             anchor="lm",
             stroke_width=s_width,
@@ -215,9 +242,9 @@ def _render_kinetic_chunk_frame(
 
         # Foreground word with thick outline
         draw.text(
-            (curr_x, base_y),
+            (curr_x, word_y),
             word.upper(),
-            font=font,
+            font=f,
             fill=color,
             anchor="lm",
             stroke_width=s_width,
@@ -523,6 +550,47 @@ def _build_multi_scene_background(
 # Audio & SFX Mixer
 # ---------------------------------------------------------------------------
 
+def select_genre_music_track(music_folder: str, mood_context: str = "") -> Optional[str]:
+    """
+    Select the optimal royalty-free background track matching the topic and niche mood:
+    - Latin / Salsa / Dance -> music/latin
+    - Upbeat / Animals / Comedy -> music/upbeat
+    - Epic / Motivation / Sports -> music/epic
+    - Horror / Dark -> music/horror
+    - Mystery / Default -> root music or music/horror
+    """
+    if not music_folder or not os.path.isdir(music_folder):
+        return None
+
+    ctx = mood_context.lower()
+    genre_keywords = [
+        ("latin", ["salsa", "latin", "dance", "dancing", "tango", "cuba", "flamenco", "rhythm", "bossa", "mambo", "clave"]),
+        ("upbeat", ["dog", "puppy", "cat", "pet", "animal", "funny", "comedy", "game", "happy", "fun", "wholesome", "viral"]),
+        ("epic", ["sports", "athlete", "champion", "record", "motivation", "success", "heist", "hero", "win", "diamond"]),
+        ("horror", ["ghost", "creepypasta", "nightmare", "terror", "scary", "death", "monster", "demon", "killer"]),
+    ]
+
+    selected_subfolder = None
+    for genre, kw_list in genre_keywords:
+        if any(kw in ctx for kw in kw_list):
+            candidate = os.path.join(music_folder, genre)
+            if os.path.isdir(candidate) and os.listdir(candidate):
+                selected_subfolder = candidate
+                break
+
+    target_dir = selected_subfolder or music_folder
+    tracks = [
+        os.path.join(target_dir, f) for f in os.listdir(target_dir)
+        if f.lower().endswith((".mp3", ".wav", ".ogg"))
+    ]
+    if not tracks and target_dir != music_folder:
+        tracks = [
+            os.path.join(music_folder, f) for f in os.listdir(music_folder)
+            if f.lower().endswith((".mp3", ".wav", ".ogg"))
+        ]
+    return random.choice(tracks) if tracks else None
+
+
 def _mix_audio(
     voice_clip: AudioFileClip,
     total_duration: float,
@@ -533,14 +601,10 @@ def _mix_audio(
     if not music_folder or not os.path.isdir(music_folder):
         return voice_clip
 
-    music_files = [
-        f for f in os.listdir(music_folder)
-        if f.lower().endswith((".mp3", ".wav", ".ogg"))
-    ]
-    if not music_files:
+    music_path = select_genre_music_track(music_folder, "")
+    if not music_path:
         return voice_clip
 
-    music_path = os.path.join(music_folder, random.choice(music_files))
     try:
         music_clip = AudioFileClip(music_path).volumex(bg_music_volume)
         if music_clip.duration < total_duration:
@@ -562,31 +626,30 @@ def _mix_audio_advanced(
     scene_count: int = 1,
     enable_sfx: bool = True,
     scenes_media: list[dict] | None = None,
+    mood_context: str = "",
 ) -> CompositeAudioClip | AudioFileClip:
     """
     Advanced sound designer:
     - Auto-ducks background music during speech
+    - Adaptively selects music genre (latin, upbeat, epic, mystery, horror) based on mood
     - Injects scene-aware documentary Foley SFX (stamps, paper slides, highlighters, tickers)
     - Injects subtle cinematic whoosh at scene transitions
     - Injects subtle impact boom at the beginning hook
     """
     audio_tracks = [voice_clip]
 
-    # 1. Background Music with intelligent ducking
+    # 1. Background Music with intelligent ducking and genre adaptation
     if music_folder and os.path.isdir(music_folder):
-        music_files = [
-            f for f in os.listdir(music_folder)
-            if f.lower().endswith((".mp3", ".wav", ".ogg"))
-        ]
-        if music_files:
-            music_path = os.path.join(music_folder, random.choice(music_files))
+        music_path = select_genre_music_track(music_folder, mood_context)
+        if music_path and os.path.isfile(music_path):
             try:
                 music_clip = AudioFileClip(music_path).volumex(bg_music_volume * 0.75)
                 if music_clip.duration < total_duration:
                     music_clip = music_clip.audio_loop(duration=total_duration)
                 music_clip = music_clip.subclip(0, total_duration)
                 audio_tracks.append(music_clip)
-                logger.info("Mixed background track: %s", os.path.basename(music_path))
+                genre_tag = os.path.basename(os.path.dirname(music_path))
+                logger.info("Mixed background track [%s]: %s", genre_tag, os.path.basename(music_path))
             except Exception as exc:
                 logger.warning("Background music failed: %s", exc)
 
@@ -757,6 +820,7 @@ def compose_video(
         scene_count=scene_count,
         enable_sfx=enable_sfx,
         scenes_media=getattr(media, "scenes_media", None),
+        mood_context=f"{title} {script[:200]}",
     )
     bg = bg.set_audio(final_audio)
 

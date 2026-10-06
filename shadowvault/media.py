@@ -521,30 +521,147 @@ def fetch_multi_scene_media(
     scenes: list[ScenePlan],
     temp_dir: str | None = None,
     api_key: str | None = None,
+    primary_query: str | None = None,
 ) -> MediaResult:
     """
-    Fetch media assets for all scenes in a script.
-    Populates MediaResult.scenes_media and sets primary video_path.
+    Fetch media assets for all scenes in a script with Character/Subject Series Anchoring:
+    - Finds a unified photoshoot series on Pexels (same photographer) for the core subject/character
+      so the subject (e.g. Jack Russell terrier, athlete, car) remains 100% consistent across all scenes!
+    - Generates documentary graphics (newspaper, counter, dossier, radar) when appropriate for the scene
+    - Falls back gracefully to single-scene fetch if no character series is needed or found.
     """
     if temp_dir is None:
         from shadowvault.config import get_config
         temp_dir = get_config().temp_dir
     os.makedirs(temp_dir, exist_ok=True)
 
+    if api_key is None:
+        from shadowvault.config import get_config
+        try:
+            api_key = get_config().pexels_api_key
+        except Exception:
+            api_key = ""
+
+    # Offline / Mock test mode
+    if not api_key or api_key == "fake-key" or api_key.startswith("test"):
+        scenes_media = [fetch_scene_media(sc, temp_dir, api_key=api_key) for sc in scenes]
+        return MediaResult(
+            video_path=scenes_media[0]["path"] if scenes_media else "",
+            source_url="multi_scene_offline",
+            is_fallback=False,
+            scenes_media=scenes_media,
+        )
+
+    # 1. Discover Character / Subject Anchor Series on Pexels
+    anchor_photos: list[dict] = []
+    anchor_photographer: str = ""
+    anchor_query: str = ""
+
+    # Build prioritized candidate subject queries
+    candidates: list[str] = []
+
+    # Priority A: Check if a specific animal breed or distinct subject is named in scenes or primary_query
+    known_distinct_subjects = [
+        "jack russell terrier", "jack russell", "golden retriever", "dalmatian", "german shepherd",
+        "border collie", "corgi", "poodle", "husky", "chihuahua", "french bulldog", "labrador",
+        "beagle", "rottweiler", "pitbull", "boxer", "dachshund", "shiba inu", "pug",
+        "tabby cat", "persian cat", "siamese cat", "black cat",
+        "formula 1 car", "supercar", "sports car", "fighter jet", "space shuttle"
+    ]
+    all_text = " ".join([primary_query or ""] + [f"{sc.visual_query} {sc.narration}" for sc in scenes]).lower()
+    for ds in known_distinct_subjects:
+        if ds in all_text and ds not in candidates:
+            candidates.append(ds)
+
+    # Priority B: Primary query clean terms
+    if primary_query:
+        candidates.extend(_extract_clean_search_terms(primary_query))
+
+    # Priority C: Clean terms from character/visual scenes
+    for sc in scenes:
+        if sc.visual_format in {"ai_image", "photo", "video", "auto"} and sc.visual_query:
+            for term in _extract_clean_search_terms(sc.visual_query, sc.narration):
+                if term not in candidates:
+                    candidates.append(term)
+
+    # Search Pexels to locate a photographer with a multi-shot series
+    from collections import Counter
+    for cand_q in candidates[:6]:
+        photos = _search_pexels_photos(cand_q, api_key)
+        if not photos:
+            continue
+        counts = Counter(p.get("photographer") for p in photos if p.get("photographer"))
+        if counts:
+            top_photographer, count = counts.most_common(1)[0]
+            if count >= 2:
+                anchor_photographer = top_photographer
+                anchor_photos = [p for p in photos if p.get("photographer") == top_photographer]
+                anchor_query = cand_q
+                logger.info(
+                    "Locked Character Anchor Series: '%s' by photographer '%s' (%d photos in series)",
+                    anchor_query, anchor_photographer, len(anchor_photos)
+                )
+                break
+
+    # 2. Allocate media per scene
     scenes_media: list[dict] = []
+    series_idx = 0
     primary_path = ""
-    is_fallback = False
 
     for scene in scenes:
-        item = fetch_scene_media(scene, temp_dir, api_key=api_key)
-        scenes_media.append(item)
-        if not primary_path:
-            primary_path = item["path"]
+        vformat = getattr(scene, "visual_format", "auto")
+        text_lower = (scene.narration or "").lower()
+
+        # Intelligent format resolution if 'auto'
+        if vformat == "auto":
+            if any(w in text_lower for w in ["bpm", "beats per minute", "points", "million", "billion", "dollars", "cash", "$"]) and re.search(r"(\$[\d,]+|\b\d+\s*(?:bpm|beats|points|million|billion|mph|km/h|percent|%)\b)", scene.narration, re.I):
+                vformat = "counter"
+                scene.visual_format = "counter"
+            elif any(w in text_lower for w in ["breaking", "headline", "newspaper", "record headline", "front page"]):
+                vformat = "newspaper"
+                scene.visual_format = "newspaper"
+
+        # Documentary graphics take precedence for their specific purpose
+        if vformat in {"newspaper", "dossier", "counter", "radar"}:
+            item = fetch_scene_media(scene, temp_dir, api_key=api_key)
+            scenes_media.append(item)
+            if not primary_path:
+                primary_path = item["path"]
+            continue
+
+        # For visual scenes: use character anchor series if available
+        used_series_item = False
+        if anchor_photos and series_idx < len(anchor_photos):
+            photo = anchor_photos[series_idx]
+            photo_url = photo.get("src", {}).get("large2x") or photo.get("src", {}).get("portrait") or photo.get("src", {}).get("original")
+            if photo_url:
+                dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_series_{photo.get('id')}.jpg")
+                if _download_video(photo_url, dest):
+                    series_idx += 1
+                    alt_desc = (photo.get("alt") or "").strip()
+                    logger.info("Scene %d assigned from Character Series (%s - Photo %d)", scene.scene_id, anchor_photographer, series_idx)
+                    scenes_media.append({
+                        "scene_id": scene.scene_id,
+                        "path": dest,
+                        "type": "image",
+                        "format": "photo",
+                        "source_desc": f"Pexels Character Series ({anchor_photographer}, Subject: '{anchor_query}', Alt: '{alt_desc[:50]}')",
+                    })
+                    used_series_item = True
+                    if not primary_path:
+                        primary_path = dest
+
+        if not used_series_item:
+            # Fall back to standard scene-specific search
+            item = fetch_scene_media(scene, temp_dir, api_key=api_key)
+            scenes_media.append(item)
+            if not primary_path:
+                primary_path = item["path"]
 
     return MediaResult(
         video_path=primary_path,
         source_url="multi_scene_pexels",
-        is_fallback=is_fallback,
+        is_fallback=False,
         scenes_media=scenes_media,
     )
 

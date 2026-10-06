@@ -295,4 +295,62 @@ class TestRadarAndPacingEnhancements:
         assert "dossier" in formats
         assert "ai_image" in formats
 
+    def test_select_genre_music_track(self, tmp_path):
+        from shadowvault.video import select_genre_music_track
+        # Setup mock music subfolders
+        latin_dir = tmp_path / "latin"
+        latin_dir.mkdir()
+        (latin_dir / "salsa_track.mp3").write_text("dummy")
+
+        upbeat_dir = tmp_path / "upbeat"
+        upbeat_dir.mkdir()
+        (upbeat_dir / "funk_track.mp3").write_text("dummy")
+
+        epic_dir = tmp_path / "epic"
+        epic_dir.mkdir()
+        (epic_dir / "hero_track.mp3").write_text("dummy")
+
+        # Test salsa / latin context
+        track = select_genre_music_track(str(tmp_path), "The Dog That Danced Salsa")
+        assert track is not None
+        assert "salsa_track.mp3" in track
+
+        # Test sports / epic context
+        track = select_genre_music_track(str(tmp_path), "Olympic Champion Breaks World Record")
+        assert track is not None
+        assert "hero_track.mp3" in track
+
+        # Test animals / upbeat context
+        track = select_genre_music_track(str(tmp_path), "Cute Puppy Playing Funny Games")
+        assert track is not None
+        assert "funk_track.mp3" in track
+
+    def test_character_series_anchoring(self, monkeypatch, tmp_path):
+        from shadowvault.media import fetch_multi_scene_media
+        from shadowvault.models import ScenePlan
+
+        mock_photos = [
+            {"id": 101, "photographer": "Krista Glizdeniece", "src": {"large2x": "http://mock/1.jpg"}, "alt": "Dog pose 1"},
+            {"id": 102, "photographer": "Krista Glizdeniece", "src": {"large2x": "http://mock/2.jpg"}, "alt": "Dog pose 2"},
+            {"id": 103, "photographer": "Krista Glizdeniece", "src": {"large2x": "http://mock/3.jpg"}, "alt": "Dog pose 3"},
+            {"id": 201, "photographer": "Random Photographer", "src": {"large2x": "http://mock/other.jpg"}, "alt": "Other dog"},
+        ]
+        monkeypatch.setattr("shadowvault.media._search_pexels_photos", lambda q, k: mock_photos)
+        monkeypatch.setattr("shadowvault.media._download_video", lambda url, dest: (open(dest, "wb").write(b"data"), True)[1])
+
+        scenes = [
+            ScenePlan(1, "Introducing the salsa dog", "jack russell terrier", visual_format="photo"),
+            ScenePlan(2, "Dog practicing the routine", "jack russell terrier dancing", visual_format="photo"),
+            ScenePlan(3, "Reaching 180 beats per minute", "180 beats per minute", visual_format="counter"),
+            ScenePlan(4, "Winning the gold medal", "jack russell terrier champion", visual_format="photo"),
+        ]
+        res = fetch_multi_scene_media(scenes, temp_dir=str(tmp_path), api_key="real-mock-key", primary_query="jack russell terrier")
+        assert len(res.scenes_media) == 4
+        # Scenes 1, 2, 4 should all use Krista Glizdeniece's series
+        assert "Krista Glizdeniece" in res.scenes_media[0]["source_desc"]
+        assert "Krista Glizdeniece" in res.scenes_media[1]["source_desc"]
+        assert "Krista Glizdeniece" in res.scenes_media[3]["source_desc"]
+        # Scene 3 should be animated counter
+        assert res.scenes_media[2]["format"] == "counter"
+
 

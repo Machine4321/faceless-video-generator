@@ -94,7 +94,10 @@ async def run_once(
         # Stage 2: Background visual sourcing
         logger.info("[2/5] Sourcing visual media ...")
         if getattr(run.content, "scenes", None) and len(run.content.scenes) > 1:
-            run.media = media_stage.fetch_multi_scene_media(run.content.scenes)
+            run.media = media_stage.fetch_multi_scene_media(
+                run.content.scenes,
+                primary_query=run.content.visual_search_keyword,
+            )
             for sc in getattr(run.media, "scenes_media", []):
                 if sc.get("path"):
                     run.temp_files.append(sc["path"])
