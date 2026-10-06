@@ -27,6 +27,7 @@ class ScenePlan:
     duration: float = 0.0          # Measured or estimated duration in seconds
     visual_path: Optional[str] = None
     visual_type: str = "video"     # "video" or "image"
+    visual_format: str = "auto"    # "auto", "ai_image", "newspaper", "dossier", "counter", "video"
     caption_highlight_words: list[str] = field(default_factory=list)
 
 

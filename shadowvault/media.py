@@ -161,7 +161,7 @@ def fetch_scene_media(
     api_key: str | None = None,
 ) -> dict:
     """
-    Fetch best media (video or photo) for an individual scene.
+    Fetch best media (documentary graphic, AI image, Pexels video, or photo) for a scene.
     Returns dict: {'scene_id': int, 'path': str, 'type': 'video'|'image'}
     """
     if api_key is None:
@@ -174,7 +174,73 @@ def fetch_scene_media(
     os.makedirs(temp_dir, exist_ok=True)
     query = scene.visual_query or "cinematic mystery"
 
-    # 1. Try Pexels Video (multi-tier query for maximum hit rate)
+    # Explicit offline / mock test mode
+    if api_key == "":
+        dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
+        _create_procedural_backdrop(scene.scene_id, dest)
+        return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+
+    import re
+    vformat = getattr(scene, "visual_format", "auto")
+    text_lower = (scene.narration or "").lower()
+
+    # Intelligent format selection when format is 'auto'
+    if vformat == "auto":
+        if scene.scene_id == 1 and any(w in text_lower for w in ["sentenced", "arrest", "breaking", "heist", "stole", "found", "shocking", "discovered", "death", "police"]):
+            vformat = "newspaper"
+        elif any(w in text_lower for w in ["fbi", "police", "cia", "secret", "confidential", "classified", "investigation", "dossier", "surveillance", "evidence"]):
+            vformat = "dossier"
+        elif any(w in text_lower for w in ["million", "billion", "dollars", "cash", "$", "worth", "stolen"]) and re.search(r"(\$[\d,]+|\b\d+\s*(?:million|billion)\b)", scene.narration, re.I):
+            vformat = "counter"
+        else:
+            vformat = "ai_image"
+
+    # 1. Documentary Evidence Graphic: Newspaper Clipping (with highlighter effect)
+    if vformat == "newspaper":
+        try:
+            from shadowvault.graphics import render_newspaper_frame
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_news_{random.randint(1000, 9999)}.jpg")
+            render_newspaper_frame(headline=scene.narration, dest_path=dest)
+            logger.info("Generated Vox-style newspaper graphic for scene %d", scene.scene_id)
+            return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        except Exception as exc:
+            logger.warning("Newspaper graphic generation failed: %s", exc)
+
+    # 2. Documentary Evidence Graphic: Classified Dossier (red stamp + redaction bars)
+    if vformat == "dossier":
+        try:
+            from shadowvault.graphics import render_classified_dossier
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_dossier_{random.randint(1000, 9999)}.jpg")
+            render_classified_dossier(title=scene.visual_query, body_text=scene.narration, dest_path=dest)
+            logger.info("Generated classified FBI dossier for scene %d", scene.scene_id)
+            return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        except Exception as exc:
+            logger.warning("Classified dossier generation failed: %s", exc)
+
+    # 3. Documentary Graphic: Stat / Counter Card
+    if vformat == "counter":
+        try:
+            from shadowvault.graphics import render_stat_counter_card
+            m = re.search(r"(\$[\d,]+(?:\.\d+)?|\b\d+[\d,]*\s*(?:million|billion|thousand)?\b)", scene.narration, re.IGNORECASE)
+            stat_val = m.group(0) if m else "$100M"
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.jpg")
+            render_stat_counter_card(stat_value=stat_val, stat_label="DOCUMENTED RECORD", dest_path=dest)
+            logger.info("Generated stat counter card for scene %d (%s)", scene.scene_id, stat_val)
+            return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        except Exception as exc:
+            logger.warning("Stat counter generation failed: %s", exc)
+
+    # 4. Custom 100% Unique AI Visual (Flux)
+    if vformat in {"ai_image", "auto"}:
+        try:
+            from shadowvault.image_gen import generate_ai_image
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_ai_{random.randint(1000, 9999)}.jpg")
+            if generate_ai_image(prompt=scene.visual_query, dest_path=dest):
+                return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
+        except Exception as exc:
+            logger.warning("AI image generation call failed: %s", exc)
+
+    # 5. Pexels Video (multi-tier query fallback)
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
         search_queries = [query]
         words = query.split()
@@ -191,7 +257,7 @@ def fetch_scene_media(
                     if _download_video(best_link, dest):
                         return {"scene_id": scene.scene_id, "path": dest, "type": "video"}
 
-        # 2. Try Pexels Photo (portrait high-res for Ken Burns)
+        # 6. Pexels Photo (portrait high-res for Ken Burns)
         for sq in search_queries:
             photos = _search_pexels_photos(sq, api_key)
             if photos:
@@ -201,7 +267,7 @@ def fetch_scene_media(
                     if _download_video(photo_url, dest):
                         return {"scene_id": scene.scene_id, "path": dest, "type": "image"}
 
-    # 3. Procedural cinematic backdrop fallback (only when offline or no API key)
+    # 7. Procedural cinematic backdrop fallback (only when completely offline or all APIs fail)
     dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_procedural.jpg")
     _create_procedural_backdrop(scene.scene_id, dest)
     return {"scene_id": scene.scene_id, "path": dest, "type": "image"}

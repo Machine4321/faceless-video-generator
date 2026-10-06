@@ -349,7 +349,10 @@ TASK:
    - Build relentless tension with every sentence.
    - Deliver an unexpected revelation or mind-bending conclusion at the end.
    - Break the script into 5 to 7 sequential visual scenes (1-2 punchy sentences per scene).
-   - For each scene, specify a vivid portrait Pexels stock footage visual query (2-3 English words, e.g. "telescope stars dark", "police flashing lights", "laboratory glowing science") and an audio SFX cue ("impact", "whoosh", "glitch", "cash", "heartbeat").
+   - For each scene, specify:
+     * visual_query: vivid English visual description (e.g. "dark bank vault lasers", "police cars sirens")
+     * visual_format: "newspaper" (for headline/arrest/breaking event), "dossier" (for secrets/FBI files), "counter" (for money/amounts), or "ai_image" (for dramatic story scenes)
+     * sfx_cue: "impact", "whoosh", "glitch", "cash", or "heartbeat"
 
 2. ALL-CAPS VIRAL CLICKBAIT TITLE (under 8 words, ultra-compelling).
 3. Primary English fallback search keyword (1-2 words).
@@ -365,12 +368,12 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
     {{
       "scene_id": 1,
       "narration": "First sentence matching the hook...",
-      "visual_query": "specific search phrase for pexels",
+      "visual_query": "specific search phrase",
+      "visual_format": "newspaper",
       "sfx_cue": "impact"
     }}
   ]
 }}"""
-
 
 
 def _split_into_scenes(script: str, default_keyword: str) -> list[ScenePlan]:
@@ -381,20 +384,19 @@ def _split_into_scenes(script: str, default_keyword: str) -> list[ScenePlan]:
         return [ScenePlan(1, script, default_keyword, "impact")]
 
     scenes: list[ScenePlan] = []
-    sfx_choices = ["whoosh", "impact", "glitch", "cash", "heartbeat"]
-
     for idx, sentence in enumerate(sentences, start=1):
         cue = "impact" if idx == 1 else ("whoosh" if idx < len(sentences) else "impact")
-        # Generate varied visual query based on sentence keywords
         words = [re.sub(r"[^\w]", "", w).lower() for w in sentence.split()]
         filtered = [w for w in words if len(w) > 4 and w not in {"there", "their", "about", "would", "could", "should", "every", "before"}]
         query = " ".join(filtered[:3]) if filtered else default_keyword
+        vformat = "newspaper" if idx == 1 else ("dossier" if idx == 3 else "ai_image")
         scenes.append(
             ScenePlan(
                 scene_id=idx,
                 narration=sentence,
                 visual_query=query,
                 sfx_cue=cue,
+                visual_format=vformat,
             )
         )
     return scenes
@@ -427,6 +429,7 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
                         narration=clean_text(item["narration"]),
                         visual_query=clean_text(item.get("visual_query", visual_search)),
                         sfx_cue=item.get("sfx_cue") or ("whoosh" if idx > 1 else "impact"),
+                        visual_format=item.get("visual_format", "auto"),
                     )
                 )
 
