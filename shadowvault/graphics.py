@@ -132,7 +132,8 @@ def render_newspaper_frame(
     Render a high-impact newspaper clipping resting on an investigation desk
     with a vibrant fluorescent yellow highlighter marker wipe.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     sheet_w, sheet_h = 940, 1540
     paper_tints = [
@@ -235,7 +236,8 @@ def render_classified_dossier(
     Render a physical classified FBI / CIA document resting on a tactical desk
     with redacted censor bars and an authentic red rubber stamp.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     sheet_w, sheet_h = 920, 1520
     doc_tints = [
@@ -341,71 +343,88 @@ UNITS_KEYWORDS = {
 }
 
 
-def parse_stat_from_narration(narration: str) -> tuple[int, str, str, str]:
+def parse_stat_from_narration(narration: str, fallback_query: str = "") -> tuple[int, str, str, str]:
     """
     Intelligently extract the primary numerical stat, prefix, suffix, and contextual label
     from narration text, supporting both word numbers ("eighty-four thousand tons")
     and digits ("$100M", "84,000", "72 seconds").
+    If narration has no numbers, checks fallback_query.
 
     Returns: (target_value, prefix, suffix, contextual_label)
     """
-    clean = re.sub(r"(\w+)-(\w+)", r"\1 \2", narration.lower())
+    # Check narration first, then fallback_query if needed
+    for candidate_text in [narration, fallback_query]:
+        if not candidate_text:
+            continue
+        clean = re.sub(r"(\w+)-(\w+)", r"\1 \2", candidate_text.lower())
 
-    # Detect unit across the sentence
-    detected_unit = ""
-    for w, u in UNITS_KEYWORDS.items():
-        if re.search(r"\b" + re.escape(w) + r"\b", clean):
-            detected_unit = u
-            break
-
-    # 1. First check explicit digit patterns e.g. $100M, 84,000 tons, 10 layers
-    m_dig = re.search(
-        r"(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*\b(k|m|b|million|billion|thousand)\b)?",
-        clean,
-    )
-    if m_dig:
-        prefix = "$" if (m_dig.group(1) or detected_unit == "$" or "dollar" in clean) else ""
-        raw_num = float(m_dig.group(2).replace(",", ""))
-        scale_str = (m_dig.group(3) or "").lower()
-        if scale_str in {"k", "thousand"}:
-            num = int(raw_num * 1_000)
-        elif scale_str in {"m", "million"}:
-            num = int(raw_num * 1_000_000)
-        elif scale_str in {"b", "billion"}:
-            num = int(raw_num * 1_000_000_000)
-        else:
-            num = int(raw_num)
-        suffix = detected_unit if detected_unit != "$" else ""
-        return _categorize_stat(num, prefix, suffix, narration)
-
-    # 2. Parse English written words (e.g. "eighty-four thousand", "one hundred million")
-    words = re.findall(r"\b[a-z\-]+\b", clean)
-    total = 0
-    current = 0
-    found_any = False
-
-    for w in words:
-        if w in WORD_TO_NUM:
-            current += WORD_TO_NUM[w]
-            found_any = True
-        elif w in SCALES:
-            scale = SCALES[w]
-            current = (current if current != 0 else 1) * scale
-            if scale >= 1000:
-                total += current
-                current = 0
-            found_any = True
-        else:
-            if found_any:
+        # Detect unit across the sentence
+        detected_unit = ""
+        for w, u in UNITS_KEYWORDS.items():
+            if re.search(r"\b" + re.escape(w) + r"\b", clean):
+                detected_unit = u
                 break
 
-    total += current
-    if found_any and total > 0:
-        prefix = "$" if (detected_unit == "$" or "dollar" in clean) else ""
-        suffix = detected_unit if detected_unit != "$" else ""
-        return _categorize_stat(total, prefix, suffix, narration)
+        # 1. First check explicit digit patterns e.g. $100M, 84,000 tons, 10 layers, 1,420 mhz
+        m_dig = re.search(
+            r"(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*\b(k|m|b|million|billion|thousand|mhz|ghz|tons|km)\b)?",
+            clean,
+        )
+        if m_dig:
+            prefix = "$" if (m_dig.group(1) or detected_unit == "$" or "dollar" in clean) else ""
+            raw_num = float(m_dig.group(2).replace(",", ""))
+            scale_str = (m_dig.group(3) or "").lower()
+            if scale_str in {"k", "thousand"}:
+                num = int(raw_num * 1_000)
+            elif scale_str in {"m", "million"}:
+                num = int(raw_num * 1_000_000)
+            elif scale_str in {"b", "billion"}:
+                num = int(raw_num * 1_000_000_000)
+            else:
+                num = int(raw_num)
+            suffix = detected_unit if detected_unit != "$" else ""
+            if not suffix and scale_str in {"mhz", "ghz", "tons", "km"}:
+                suffix = scale_str.upper()
+            return _categorize_stat(num, prefix, suffix, candidate_text)
 
-    # 3. Fallback default
+        # 2. Parse English written words (e.g. "eighty-four thousand", "one hundred million")
+        words = re.findall(r"\b[a-z\-]+\b", clean)
+        total = 0
+        current = 0
+        found_any = False
+
+        for w in words:
+            if w in WORD_TO_NUM:
+                current += WORD_TO_NUM[w]
+                found_any = True
+            elif w in SCALES:
+                scale = SCALES[w]
+                current = (current if current != 0 else 1) * scale
+                if scale >= 1000:
+                    total += current
+                    current = 0
+                found_any = True
+            else:
+                if found_any:
+                    break
+
+        total += current
+        if found_any and total > 0:
+            prefix = "$" if (detected_unit == "$" or "dollar" in clean) else ""
+            suffix = detected_unit if detected_unit != "$" else ""
+            return _categorize_stat(total, prefix, suffix, candidate_text)
+
+    # 3. Contextual intelligent fallback based on keywords instead of blind $100M
+    combined = f"{narration} {fallback_query}".lower()
+    if any(k in combined for k in ["space", "astronomy", "signal", "radio", "telescope", "pulse", "wow"]):
+        return (1420, "", "MHZ", "INTERCEPTED FREQUENCY")
+    if any(k in combined for k in ["dust", "meteor", "venus", "debris", "tons", "acid"]):
+        return (84000, "", "TONS", "ANNUAL SPACE DEBRIS")
+    if any(k in combined for k in ["speed", "light", "distance", "galaxy", "orbit", "km"]):
+        return (60, "", "KM", "ATMOSPHERIC ALTITUDE")
+    if any(k in combined for k in ["year", "century", "decades", "timeline"]):
+        return (49, "", "YEARS", "RECORDED TIMELINE")
+
     return (100_000_000, "$", "", "DOCUMENTED RECORD")
 
 
@@ -420,10 +439,12 @@ def _categorize_stat(num: int, prefix: str, suffix: str, text: str) -> tuple[int
         label = "STOLEN VALUATION"
     elif "dollar" in text_l or prefix == "$":
         label = "FINANCIAL RECORD"
+    elif "mhz" in text_l or suffix == "MHZ":
+        label = "INTERCEPTED FREQUENCY"
     elif "signal" in text_l or suffix in {"HOURS", "SECONDS", "MINUTES"}:
         label = "RECORDED DURATION"
-    elif "distance" in text_l or suffix == "LIGHT-YEARS":
-        label = "COSMIC DISTANCE"
+    elif "distance" in text_l or suffix in {"LIGHT-YEARS", "KM", "MILES"}:
+        label = "COSMIC MEASUREMENT"
     elif "can" in text_l:
         label = "ANNUAL SALES VOLUME"
     elif "year" in text_l or suffix == "YEARS":
@@ -431,6 +452,46 @@ def _categorize_stat(num: int, prefix: str, suffix: str, text: str) -> tuple[int
     else:
         label = "DOCUMENTED RECORD"
     return (num, prefix, suffix, label)
+
+
+COUNTER_THEMES = {
+    "gold": {
+        "glow": (255, 215, 0),
+        "border": (255, 215, 0, 190),
+        "inner_border": (255, 215, 0, 60),
+        "accent": (255, 215, 0, 140),
+        "val_done": (255, 235, 30),
+        "val_anim": (255, 215, 0),
+        "label": (210, 210, 210),
+    },
+    "emerald": {
+        "glow": (0, 255, 136),
+        "border": (0, 255, 136, 190),
+        "inner_border": (0, 255, 136, 60),
+        "accent": (0, 255, 136, 140),
+        "val_done": (30, 255, 160),
+        "val_anim": (0, 255, 136),
+        "label": (190, 240, 210),
+    },
+    "cyan": {
+        "glow": (0, 220, 255),
+        "border": (0, 220, 255, 190),
+        "inner_border": (0, 220, 255, 60),
+        "accent": (0, 220, 255, 140),
+        "val_done": (90, 245, 255),
+        "val_anim": (0, 220, 255),
+        "label": (200, 240, 255),
+    },
+    "crimson": {
+        "glow": (255, 60, 60),
+        "border": (255, 60, 60, 190),
+        "inner_border": (255, 60, 60, 60),
+        "accent": (255, 60, 60, 140),
+        "val_done": (255, 90, 90),
+        "val_anim": (255, 60, 60),
+        "label": (255, 200, 200),
+    },
+}
 
 
 def render_animated_counter_video(
@@ -443,15 +504,34 @@ def render_animated_counter_video(
     fps: int = 30,
     width: int = 1080,
     height: int = 1920,
+    theme: Optional[str] = None,
 ) -> str:
     """
     Render an ultra-smooth animated counting-up motion graphic video.
     The number rapidly rolls/climbs upwards from 0 to the target number
-    over the first 1.35 seconds with cubic ease-out, then locks in with a gold glow.
+    over the first 1.35 seconds with cubic ease-out, displaying real rolling digits
+    before locking in with an intense thematic glow.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
     frames_total = max(1, int(fps * duration))
     anim_frames = min(frames_total, max(1, int(fps * 1.35)))
+
+    # Auto-select visual theme if not provided
+    if not theme:
+        lbl_lower = stat_label.lower()
+        if prefix == "$" or "financial" in lbl_lower or "stolen" in lbl_lower or "vault" in lbl_lower:
+            theme = "gold"
+        elif "frequency" in lbl_lower or "radar" in lbl_lower or suffix in {"MHZ", "GHZ"}:
+            theme = "emerald"
+        elif "cosmic" in lbl_lower or "space" in lbl_lower or "distance" in lbl_lower or suffix in {"KM", "LIGHT-YEARS"}:
+            theme = "cyan"
+        elif "threat" in lbl_lower or "alert" in lbl_lower or "danger" in lbl_lower:
+            theme = "crimson"
+        else:
+            theme = random.choice(["gold", "emerald", "cyan"])
+
+    palette = COUNTER_THEMES.get(theme, COUNTER_THEMES["gold"])
 
     font_lbl = _load_font("sans", size=36, bold=True)
     font_val = _load_font("impact", size=96)
@@ -472,37 +552,34 @@ def render_animated_counter_video(
                 tau = f_idx / float(anim_frames)
                 prog = 1.0 - (1.0 - tau) ** 3  # cubic ease-out
                 cur_num = int(target_value * prog)
+                # During animation, display actual rolling digits for maximum kinetic thrill
+                val_str = f"{prefix}{cur_num:,} {suffix}".strip()
             else:
                 cur_num = target_value
-
-            if target_value >= 1_000_000_000 and target_value % 1_000_000_000 == 0:
-                val_str = f"{prefix}{cur_num // 1_000_000_000}B {suffix}".strip()
-            elif target_value >= 1_000_000 and target_value % 1_000_000 == 0:
-                val_str = f"{prefix}{cur_num // 1_000_000}M {suffix}".strip()
-            else:
-                val_str = f"{prefix}{cur_num:,} {suffix}".strip()
+                val_str = f"{prefix}{target_value:,} {suffix}".strip()
 
             img = Image.new("RGB", (width, height), (12, 14, 20))
             draw = ImageDraw.Draw(img)
 
-            # Center ambient gold glow
+            # Center ambient glow
             glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
             g_draw = ImageDraw.Draw(glow)
-            glow_intensity = 35 if f_idx >= anim_frames else 22
-            g_draw.ellipse([180, 480, width - 180, 1180], fill=(255, 215, 0, glow_intensity))
+            glow_intensity = 42 if f_idx >= anim_frames else 26
+            glow_color = palette["glow"] + (glow_intensity,)
+            g_draw.ellipse([180, 480, width - 180, 1180], fill=glow_color)
             glow = glow.filter(ImageFilter.GaussianBlur(130))
             img.paste(glow, (0, 0), glow)
 
-            # Golden tactical card outline (Y: 500 to 1120)
-            draw.rounded_rectangle([90, 500, width - 90, 1120], radius=24, outline=(255, 215, 0, 180), width=3)
-            draw.rounded_rectangle([98, 508, width - 98, 1112], radius=18, outline=(255, 215, 0, 60), width=1)
+            # Tactical card outline (Y: 500 to 1120)
+            draw.rounded_rectangle([90, 500, width - 90, 1120], radius=24, outline=palette["border"], width=3)
+            draw.rounded_rectangle([98, 508, width - 98, 1112], radius=18, outline=palette["inner_border"], width=1)
 
             # Category Header Label
-            draw.text((width // 2, 610), stat_label.upper(), fill=(200, 200, 200), font=font_lbl, anchor="mm")
-            draw.line([(width // 2 - 140, 655), (width // 2 + 140, 655)], fill=(255, 215, 0, 140), width=2)
+            draw.text((width // 2, 610), stat_label.upper(), fill=palette["label"], font=font_lbl, anchor="mm")
+            draw.line([(width // 2 - 140, 655), (width // 2 + 140, 655)], fill=palette["accent"], width=2)
 
-            # Animated Rising Number Value (Glowing Gold)
-            num_color = (255, 235, 30) if f_idx >= anim_frames else (255, 215, 0)
+            # Animated Rising Number Value (Theme Color)
+            num_color = palette["val_done"] if f_idx >= anim_frames else palette["val_anim"]
             draw.text((width // 2, 795), val_str.upper(), fill=num_color, font=font_val, anchor="mm")
 
             # Sub-caption
@@ -512,7 +589,7 @@ def render_animated_counter_video(
     finally:
         writer.close()
 
-    logger.info("Rendered animated counter video -> %s (%s: %s)", dest_path, stat_label, val_str)
+    logger.info("Rendered animated counter video -> %s (%s: %s | theme: %s)", dest_path, stat_label, val_str, theme)
     return dest_path
 
 
@@ -527,7 +604,8 @@ def render_stat_counter_card(
     Render a high-tech glowing static stat card (fallback).
     Positioned in upper-middle area to prevent subtitle collision.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     img = Image.new("RGB", (width, height), (12, 14, 20))
     draw = ImageDraw.Draw(img)
@@ -573,7 +651,8 @@ def render_radar_scope_frame(
     Used for deep space signals, military radar anomalies, and high-frequency tracking.
     Positioned in upper-middle area (Y: 340 to 1200) to keep subtitles fully clear.
     """
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    if dest_path and os.path.dirname(dest_path):
+        os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
     img = Image.new("RGB", (width, height), (10, 15, 14))
     draw = ImageDraw.Draw(img)
@@ -602,15 +681,21 @@ def render_radar_scope_frame(
     draw.line([(cx - int(r_max * 0.707), cy - int(r_max * 0.707)), (cx + int(r_max * 0.707), cy + int(r_max * 0.707))], fill=(0, 200, 110, 45), width=1)
     draw.line([(cx - int(r_max * 0.707), cy + int(r_max * 0.707)), (cx + int(r_max * 0.707), cy - int(r_max * 0.707))], fill=(0, 200, 110, 45), width=1)
 
-    # Translucent Radar Sweep Sector
+    # Translucent Radar Sweep Sector (Dynamic Angle)
     sweep = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(sweep)
-    s_draw.pieslice([cx - r_max, cy - r_max, cx + r_max, cy + r_max], start=-65, end=0, fill=(0, 255, 140, 45))
-    s_draw.line([(cx, cy), (cx + int(r_max * math.cos(0)), cy + int(r_max * math.sin(0)))], fill=(0, 255, 160, 220), width=3)
+    sweep_start = random.randint(-180, 180)
+    sweep_end = sweep_start + 65
+    s_rad = math.radians(sweep_end)
+    s_draw.pieslice([cx - r_max, cy - r_max, cx + r_max, cy + r_max], start=sweep_start, end=sweep_end, fill=(0, 255, 140, 45))
+    s_draw.line([(cx, cy), (cx + int(r_max * math.cos(s_rad)), cy + int(r_max * math.sin(s_rad)))], fill=(0, 255, 160, 220), width=3)
     img.paste(sweep, (0, 0), sweep)
 
-    # Target Blip with reticle brackets
-    blip_x, blip_y = cx + 180, cy - 140
+    # Target Blip with reticle brackets (Dynamic position)
+    blip_dist = random.randint(140, 280)
+    blip_ang = math.radians(random.randint(0, 360))
+    blip_x = cx + int(blip_dist * math.cos(blip_ang))
+    blip_y = cy + int(blip_dist * math.sin(blip_ang))
     draw.ellipse([blip_x - 8, blip_y - 8, blip_x + 8, blip_y + 8], fill=(255, 50, 50, 255))
     draw.rectangle([blip_x - 22, blip_y - 22, blip_x + 22, blip_y + 22], outline=(255, 80, 80, 200), width=2)
 
@@ -618,7 +703,8 @@ def render_radar_scope_frame(
     font_mono_md = _load_font("mono", size=26, bold=True)
     font_hud_title = _load_font("mono", size=32, bold=True)
 
-    draw.text((blip_x + 30, blip_y - 12), "TARGET LOCK [+30 SIGMA]", fill=(255, 80, 80), font=font_mono_sm)
+    sigmas = ["+28 SIGMA", "+30 SIGMA", "+34 SIGMA", "+42 SIGMA"]
+    draw.text((blip_x + 30, blip_y - 12), f"TARGET LOCK [{random.choice(sigmas)}]", fill=(255, 80, 80), font=font_mono_sm)
 
     # Top HUD Telemetry
     draw.text((width // 2, 220), "FREQUENCY SPECTRUM MONITOR", fill=(0, 255, 136), font=font_hud_title, anchor="mm")

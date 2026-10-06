@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import random
+import re
 from typing import Optional
 
 import requests
@@ -126,17 +127,23 @@ def _fetch_nasa_archive_image(query: str, dest_path: str) -> Optional[str]:
                 links = item.get("links", [])
                 if links and "href" in links[0]:
                     img_url = links[0]["href"]
-                    # Prefer high-res medium/large if available
-                    img_url_hr = img_url.replace("~thumb.jpg", "~medium.jpg")
-                    img_resp = requests.get(img_url_hr, timeout=15)
-                    if img_resp.status_code != 200 or len(img_resp.content) < 10_000:
-                        img_resp = requests.get(img_url, timeout=15)
-                    if img_resp.status_code == 200 and len(img_resp.content) > 10_000:
-                        with open(dest_path, "wb") as f:
-                            f.write(img_resp.content)
-                        title = item.get("data", [{}])[0].get("title", search_term)
-                        logger.info("Fetched authentic NASA archive photograph: %s", title)
-                        return title
+                    # Try high-res alternatives first
+                    candidates = [
+                        re.sub(r"~(thumb|small)\.jpg$", "~large.jpg", img_url),
+                        re.sub(r"~(thumb|small)\.jpg$", "~medium.jpg", img_url),
+                        img_url,
+                    ]
+                    for cand_url in candidates:
+                        try:
+                            img_resp = requests.get(cand_url, timeout=15)
+                            if img_resp.status_code == 200 and len(img_resp.content) > 10_000:
+                                with open(dest_path, "wb") as f:
+                                    f.write(img_resp.content)
+                                title = item.get("data", [{}])[0].get("title", search_term)
+                                logger.info("Fetched authentic NASA archive photograph: %s", title)
+                                return title
+                        except Exception:
+                            continue
     except Exception as exc:
         logger.debug("NASA archive search skipped/failed for '%s': %s", query, exc)
     return None
@@ -298,7 +305,7 @@ def fetch_scene_media(
     if vformat == "counter":
         try:
             from shadowvault.graphics import parse_stat_from_narration, render_animated_counter_video
-            target_val, prefix, suffix, label = parse_stat_from_narration(scene.narration)
+            target_val, prefix, suffix, label = parse_stat_from_narration(scene.narration, fallback_query=scene.visual_query)
             dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_counter_{random.randint(1000, 9999)}.mp4")
             dur = max(getattr(scene, "duration", 0.0) or 4.0, 5.0)
             render_animated_counter_video(
