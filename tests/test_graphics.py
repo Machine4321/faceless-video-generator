@@ -65,3 +65,24 @@ def test_generate_ai_image_success(mock_get, tmp_path):
     success = generate_ai_image(prompt="dark bank vault", dest_path=dest)
     assert success is True
     assert os.path.isfile(dest)
+
+
+def test_procedural_foley_sfx(tmp_path):
+    from shadowvault.utils.sfx_generator import (
+        ensure_default_sfx,
+        generate_highlighter,
+        generate_paper_slide,
+        generate_stamp_thud,
+        generate_ticker,
+    )
+
+    sfx_map = ensure_default_sfx(str(tmp_path / "sfx"))
+    assert "stamp_thud" in sfx_map
+    assert "paper_slide" in sfx_map
+    assert "highlighter" in sfx_map
+    assert "ticker" in sfx_map
+
+    for name in ["stamp_thud", "paper_slide", "highlighter", "ticker"]:
+        assert os.path.isfile(sfx_map[name])
+        assert os.path.getsize(sfx_map[name]) > 500
+

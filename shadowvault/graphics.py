@@ -3,9 +3,9 @@ shadowvault/graphics.py
 Procedural Documentary & Evidence Motion Graphics Generator (Vox / MagnatesMedia style).
 
 Renders broadcast-quality 1080x1920 graphic frames:
-- Newspaper Breaking News Clipping (with fluorescent highlighter marker wipe)
-- Classified FBI / CIA Dossier (with red rubber stamp & black redaction bars)
-- Stat & Number Counter Badge (for money and dates)
+- Newspaper Breaking News Clipping (physical paper on investigation desk + fluorescent highlighter wipe)
+- Classified FBI / CIA Dossier (aged parchment with drop shadow, red rubber stamp & black redaction bars)
+- Stat & Number Counter Badge (for money, metrics, and dates)
 - 35mm Analog Film Grain Overlay
 """
 
@@ -64,12 +64,57 @@ def _load_font(
     return ImageFont.load_default()
 
 
-def add_film_grain(img: Image.Image, intensity: float = 8.0) -> Image.Image:
+def add_film_grain(img: Image.Image, intensity: float = 7.5) -> Image.Image:
     """Add subtle organic 35mm film grain to break digital sterility."""
     arr = np.array(img, dtype=np.float32)
     noise = np.random.normal(0, intensity, arr.shape)
     arr = np.clip(arr + noise, 0, 255).astype(np.uint8)
     return Image.fromarray(arr)
+
+
+def _composite_sheet_on_desk(
+    sheet: Image.Image,
+    desk_color: tuple[int, int, int] = (18, 16, 14),
+    angle: float = -1.8,
+    desk_w: int = 1080,
+    desk_h: int = 1920,
+    center_y: int = 860,
+) -> Image.Image:
+    """
+    Composite a physical document sheet with soft blurred drop shadow onto a dark desk surface.
+    Gives realistic 3D depth and separation typical of Vox / MagnatesMedia documentaries.
+    """
+    bg = Image.new("RGB", (desk_w, desk_h), desk_color)
+    bg_draw = ImageDraw.Draw(bg)
+
+    # Subtle vignette / light falloff on desk
+    vignette = Image.new("RGBA", (desk_w, desk_h), (0, 0, 0, 0))
+    v_draw = ImageDraw.Draw(vignette)
+    v_draw.ellipse([80, 200, desk_w - 80, desk_h - 200], fill=(255, 255, 255, 18))
+    vignette = vignette.filter(ImageFilter.GaussianBlur(160))
+    bg.paste(vignette, (0, 0), vignette)
+
+    sw, sh = sheet.size
+
+    # Realistic blurred drop shadow
+    shadow_pad = 60
+    shadow = Image.new("RGBA", (sw + shadow_pad * 2, sh + shadow_pad * 2), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow)
+    s_draw.rectangle([shadow_pad, shadow_pad, sw + shadow_pad, sh + shadow_pad], fill=(0, 0, 0, 160))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(28))
+
+    # Apply subtle physical angle
+    sheet_rot = sheet.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
+    shadow_rot = shadow.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
+
+    pos_x = (desk_w - sheet_rot.width) // 2
+    pos_y = center_y - (sheet_rot.height // 2)
+
+    # Offset shadow down-right to simulate overhead office desk lighting
+    bg.paste(shadow_rot, (pos_x - 12, pos_y + 18), shadow_rot)
+    bg.paste(sheet_rot, (pos_x, pos_y), sheet_rot)
+
+    return bg
 
 
 def render_newspaper_frame(
@@ -81,67 +126,62 @@ def render_newspaper_frame(
     height: int = 1920,
 ) -> str:
     """
-    Render a high-impact vintage/modern newspaper clipping with a fluorescent highlighter effect.
+    Render a high-impact newspaper clipping resting on an investigation desk
+    with a vibrant fluorescent yellow highlighter marker wipe.
     """
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-    # Aged paper background
-    paper_color = random.choice([
-        (243, 238, 228),  # Classic vintage cream
-        (238, 233, 222),  # Slightly aged parchment
-        (246, 243, 236),  # Modern broadsheet off-white
-    ])
-    img = Image.new("RGB", (width, height), paper_color)
-    draw = ImageDraw.Draw(img)
+    sheet_w, sheet_h = 940, 1540
+    paper_color = (244, 239, 230, 255)
+    sheet = Image.new("RGBA", (sheet_w, sheet_h), paper_color)
+    draw = ImageDraw.Draw(sheet)
 
     # Top Masthead Lines
-    draw.line([(50, 160), (width - 50, 160)], fill=(30, 30, 30), width=4)
-    draw.line([(50, 172), (width - 50, 172)], fill=(30, 30, 30), width=2)
+    draw.line([(40, 50), (sheet_w - 40, 50)], fill=(30, 30, 30), width=4)
+    draw.line([(40, 60), (sheet_w - 40, 60)], fill=(30, 30, 30), width=2)
 
     # Masthead Name
-    font_masthead = _load_font("serif", size=60, bold=True)
-    draw.text((width // 2, 240), "THE GLOBAL CHRONICLE", fill=(20, 20, 20), font=font_masthead, anchor="mm")
+    font_masthead = _load_font("serif", size=54, bold=True)
+    draw.text((sheet_w // 2, 115), "THE GLOBAL CHRONICLE", fill=(20, 20, 20), font=font_masthead, anchor="mm")
 
-    draw.line([(50, 305), (width - 50, 305)], fill=(30, 30, 30), width=3)
+    draw.line([(40, 170), (sheet_w - 40, 170)], fill=(30, 30, 30), width=3)
 
     # Sub-bar (Date, Edition)
-    font_sub = _load_font("sans", size=24, bold=False)
-    draw.text((width // 2, 340), f"WORLD EXCLUSIVE • {date_str.upper()} • BREAKING DISPATCH", fill=(75, 75, 75), font=font_sub, anchor="mm")
-    draw.line([(50, 375), (width - 50, 375)], fill=(30, 30, 30), width=2)
+    font_sub = _load_font("sans", size=22, bold=False)
+    draw.text((sheet_w // 2, 200), f"WORLD EXCLUSIVE • {date_str.upper()} • BREAKING DISPATCH", fill=(75, 75, 75), font=font_sub, anchor="mm")
+    draw.line([(40, 230), (sheet_w - 40, 230)], fill=(30, 30, 30), width=2)
 
     # Main Headline (All-caps, high-impact)
-    font_hl = _load_font("impact", size=86)
-    wrapped = textwrap.fill(headline.upper(), width=18)
+    font_hl = _load_font("impact", size=76)
+    wrapped = textwrap.fill(headline.upper(), width=20)
     lines = wrapped.split("\n")
 
-    # Center headline vertically around y = 620
-    start_y = 540
-    line_h = 100
+    start_y = 280
+    line_h = 88
     total_hl_h = len(lines) * line_h
 
     # Highlighter wipe layer
-    highlighter = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    highlighter = Image.new("RGBA", (sheet_w, sheet_h), (0, 0, 0, 0))
     h_draw = ImageDraw.Draw(highlighter)
 
     # Highlight the most dramatic line in fluorescent yellow
     hl_line_idx = min(1, len(lines) - 1)
     hl_y = start_y + (hl_line_idx * line_h)
-    h_draw.rectangle([80, hl_y - 10, width - 80, hl_y + 85], fill=(255, 235, 0, 125))
-    img.paste(highlighter, (0, 0), highlighter)
+    h_draw.rectangle([50, hl_y - 8, sheet_w - 50, hl_y + 76], fill=(255, 235, 0, 140))
+    sheet.paste(highlighter, (0, 0), highlighter)
 
     # Draw headline text
     curr_y = start_y
     for line in lines:
-        draw.text((width // 2, curr_y + 40), line, fill=(15, 15, 15), font=font_hl, anchor="mm")
+        draw.text((sheet_w // 2, curr_y + 36), line, fill=(15, 15, 15), font=font_hl, anchor="mm")
         curr_y += line_h
 
     # Divider below headline
-    draw.line([(60, curr_y + 30), (width - 60, curr_y + 30)], fill=(30, 30, 30), width=3)
+    draw.line([(40, curr_y + 25), (sheet_w - 40, curr_y + 25)], fill=(30, 30, 30), width=3)
 
     # Simulated newspaper columns below
-    col_w = (width - 160) // 2
-    y_body = curr_y + 70
-    font_body = _load_font("serif", size=26, bold=False)
+    y_body = curr_y + 55
+    font_body = _load_font("serif", size=24, bold=False)
 
     col1_text = (
         snippet or
@@ -155,13 +195,14 @@ def render_newspaper_frame(
         "International observers are calling this one of the most remarkable incidents in modern record."
     )
 
-    draw.multiline_text((80, y_body), textwrap.fill(col1_text, width=28), fill=(45, 45, 45), font=font_body, spacing=10)
-    draw.line([(width // 2, y_body), (width // 2, y_body + 420)], fill=(120, 120, 120), width=1)
-    draw.multiline_text((width // 2 + 30, y_body), textwrap.fill(col2_text, width=28), fill=(45, 45, 45), font=font_body, spacing=10)
+    draw.multiline_text((60, y_body), textwrap.fill(col1_text, width=24), fill=(45, 45, 45), font=font_body, spacing=8)
+    draw.line([(sheet_w // 2, y_body), (sheet_w // 2, y_body + 380)], fill=(130, 130, 130), width=1)
+    draw.multiline_text((sheet_w // 2 + 25, y_body), textwrap.fill(col2_text, width=24), fill=(45, 45, 45), font=font_body, spacing=8)
 
-    # Apply authentic 35mm film grain
-    img = add_film_grain(img, intensity=9.0)
-    img.save(dest_path, "JPEG", quality=95)
+    # Composite physical paper onto dark investigation desk
+    desk = _composite_sheet_on_desk(sheet, desk_color=(18, 16, 14), angle=-1.6, center_y=820)
+    desk = add_film_grain(desk, intensity=8.0)
+    desk.save(dest_path, "JPEG", quality=95)
     return dest_path
 
 
@@ -175,66 +216,66 @@ def render_classified_dossier(
     height: int = 1920,
 ) -> str:
     """
-    Render a classified FBI / CIA document with redacted censor bars and red rubber stamp.
+    Render a physical classified FBI / CIA document resting on a tactical desk
+    with redacted censor bars and an authentic red rubber stamp.
     """
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
-    # Dark tactical background
-    img = Image.new("RGB", (width, height), (32, 30, 28))
-    draw = ImageDraw.Draw(img)
+    sheet_w, sheet_h = 920, 1520
+    doc_bg = (230, 224, 212, 255)  # Aged manila parchment
+    sheet = Image.new("RGBA", (sheet_w, sheet_h), doc_bg)
+    draw = ImageDraw.Draw(sheet)
 
-    # Inner document sheet
-    pad = 70
-    doc_bg = (226, 219, 206)
-    draw.rectangle([pad, pad + 80, width - pad, height - pad - 80], fill=doc_bg)
-    draw.rectangle([pad + 16, pad + 96, width - pad - 16, height - pad - 96], outline=(65, 60, 55), width=2)
+    # Outer border rule
+    draw.rectangle([20, 20, sheet_w - 20, sheet_h - 20], outline=(65, 60, 55), width=2)
 
     # Header
-    font_hdr = _load_font("mono", size=36, bold=True)
-    draw.text((width // 2, pad + 150), "FEDERAL INVESTIGATION ARCHIVE", fill=(35, 30, 25), font=font_hdr, anchor="mm")
-    draw.text((width // 2, pad + 200), "SPECIAL INTELLIGENCE DIVISION // EYES ONLY", fill=(95, 85, 75), font=font_hdr, anchor="mm")
-    draw.line([(pad + 50, pad + 240), (width - pad - 50, pad + 240)], fill=(70, 65, 60), width=2)
+    font_hdr = _load_font("mono", size=32, bold=True)
+    draw.text((sheet_w // 2, 80), "FEDERAL INVESTIGATION ARCHIVE", fill=(35, 30, 25), font=font_hdr, anchor="mm")
+    draw.text((sheet_w // 2, 125), "SPECIAL INTELLIGENCE DIVISION // EYES ONLY", fill=(95, 85, 75), font=font_hdr, anchor="mm")
+    draw.line([(40, 160), (sheet_w - 40, 160)], fill=(70, 65, 60), width=2)
 
     # Metadata
-    font_meta = _load_font("mono", size=26, bold=False)
-    draw.text((pad + 60, pad + 280), f"REF: {case_id.upper()}", fill=(50, 45, 40), font=font_meta)
-    draw.text((pad + 60, pad + 325), "STATUS: DECLASSIFIED UNDER DIRECTIVE 14-B", fill=(175, 35, 35), font=font_meta)
-    draw.text((pad + 60, pad + 370), f"SUBJECT: {title.upper()[:36]}", fill=(50, 45, 40), font=font_meta)
-    draw.line([(pad + 50, pad + 415), (width - pad - 50, pad + 415)], fill=(70, 65, 60), width=2)
+    font_meta = _load_font("mono", size=24, bold=False)
+    draw.text((50, 195), f"REF: {case_id.upper()}", fill=(50, 45, 40), font=font_meta)
+    draw.text((50, 235), "STATUS: DECLASSIFIED UNDER DIRECTIVE 14-B", fill=(175, 35, 35), font=font_meta)
+    draw.text((50, 275), f"SUBJECT: {title.upper()[:36]}", fill=(50, 45, 40), font=font_meta)
+    draw.line([(40, 315), (sheet_w - 40, 315)], fill=(70, 65, 60), width=2)
 
     # Typewriter Body Text
-    font_body = _load_font("mono", size=34, bold=True)
-    y = pad + 480
-    lines = textwrap.wrap(body_text.upper(), width=32)
+    font_body = _load_font("mono", size=30, bold=True)
+    y = 370
+    lines = textwrap.wrap(body_text.upper(), width=34)
 
-    for idx, line in enumerate(lines):
-        draw.text((pad + 60, y), line, fill=(35, 30, 25), font=font_body)
+    for idx, line in enumerate(lines[:10]):
+        draw.text((50, y), line, fill=(35, 30, 25), font=font_body)
 
         # Draw realistic black redaction censor bars on select lines
         if idx in {1, 3} and len(line) > 10:
-            bar_start = pad + 60 + random.randint(0, 100)
-            bar_len = random.randint(220, 400)
-            draw.rectangle([bar_start, y - 6, min(width - pad - 60, bar_start + bar_len), y + 38], fill=(15, 15, 15))
+            bar_start = 50 + random.randint(0, 80)
+            bar_len = random.randint(200, 360)
+            draw.rectangle([bar_start, y - 4, min(sheet_w - 50, bar_start + bar_len), y + 34], fill=(15, 15, 15))
 
-        y += 65
+        y += 58
 
     # Red Rubber Stamp (Angled Grunge Stamp)
-    stamp_w, stamp_h = 480, 150
+    stamp_w, stamp_h = 440, 135
     stamp_img = Image.new("RGBA", (stamp_w, stamp_h), (0, 0, 0, 0))
     s_draw = ImageDraw.Draw(stamp_img)
-    s_draw.rectangle([8, 8, stamp_w - 8, stamp_h - 8], outline=(195, 30, 30, 225), width=8)
-    font_stamp = _load_font("impact", size=70)
-    s_draw.text((stamp_w // 2, stamp_h // 2), stamp_text.upper(), fill=(195, 30, 30, 225), font=font_stamp, anchor="mm")
+    s_draw.rectangle([6, 6, stamp_w - 6, stamp_h - 6], outline=(195, 30, 30, 230), width=7)
+    font_stamp = _load_font("impact", size=64)
+    s_draw.text((stamp_w // 2, stamp_h // 2), stamp_text.upper(), fill=(195, 30, 30, 230), font=font_stamp, anchor="mm")
 
-    # Rotate stamp
-    angle = random.choice([-14, -10, 12, 16])
+    angle = random.choice([-14, -10, 12, 15])
     stamp_rot = stamp_img.rotate(angle, expand=True, resample=Image.Resampling.BICUBIC)
-    pos_x = width - stamp_rot.width - 100
-    pos_y = height - stamp_rot.height - 350
-    img.paste(stamp_rot, (pos_x, pos_y), stamp_rot)
+    pos_x = sheet_w - stamp_rot.width - 60
+    pos_y = sheet_h - stamp_rot.height - 180
+    sheet.paste(stamp_rot, (pos_x, pos_y), stamp_rot)
 
-    img = add_film_grain(img, intensity=8.5)
-    img.save(dest_path, "JPEG", quality=95)
+    # Composite physical document onto dark tactical desk
+    desk = _composite_sheet_on_desk(sheet, desk_color=(22, 20, 18), angle=1.7, center_y=820)
+    desk = add_film_grain(desk, intensity=8.0)
+    desk.save(dest_path, "JPEG", quality=95)
     return dest_path
 
 
@@ -246,7 +287,8 @@ def render_stat_counter_card(
     height: int = 1920,
 ) -> str:
     """
-    Render a high-tech glowing stat card (e.g. '$100,000,000' or 'YEAR 1518').
+    Render a high-tech glowing stat card (e.g. '$100,000,000' or '727,000').
+    Positioned in upper-middle area to prevent subtitle collision.
     """
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
 
@@ -256,20 +298,26 @@ def render_stat_counter_card(
     # Ambient glowing background circle
     glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     g_draw = ImageDraw.Draw(glow)
-    g_draw.ellipse([200, 600, width - 200, height - 600], fill=(255, 215, 0, 30))
-    glow = glow.filter(ImageFilter.GaussianBlur(150))
+    g_draw.ellipse([180, 480, width - 180, 1180], fill=(255, 215, 0, 28))
+    glow = glow.filter(ImageFilter.GaussianBlur(140))
     img.paste(glow, (0, 0), glow)
 
-    # Center card outline
-    draw.rectangle([80, 580, width - 80, height - 580], outline=(255, 215, 0, 160), width=3)
+    # Center card outline (Y: 480 to 1100, safely above Y: 1320 subtitle zone)
+    draw.rounded_rectangle([90, 500, width - 90, 1120], radius=24, outline=(255, 215, 0, 180), width=3)
+    draw.rounded_rectangle([98, 508, width - 98, 1112], radius=18, outline=(255, 215, 0, 60), width=1)
 
     # Stat Label
-    font_lbl = _load_font("sans", size=36, bold=True)
-    draw.text((width // 2, 720), stat_label.upper(), fill=(200, 200, 200), font=font_lbl, anchor="mm")
+    font_lbl = _load_font("sans", size=32, bold=True)
+    draw.text((width // 2, 620), stat_label.upper(), fill=(200, 200, 200), font=font_lbl, anchor="mm")
+    draw.line([(width // 2 - 120, 660), (width // 2 + 120, 660)], fill=(255, 215, 0, 120), width=2)
 
     # Giant Stat Value
-    font_val = _load_font("impact", size=115)
-    draw.text((width // 2, 880), stat_value.upper(), fill=(255, 225, 0), font=font_val, anchor="mm")
+    font_val = _load_font("impact", size=108)
+    draw.text((width // 2, 800), stat_value.upper(), fill=(255, 225, 0), font=font_val, anchor="mm")
+
+    # Sub-caption inside card
+    font_sub = _load_font("mono", size=24, bold=False)
+    draw.text((width // 2, 980), "OFFICIALLY RECORDED EVIDENCE", fill=(160, 160, 160), font=font_sub, anchor="mm")
 
     img = add_film_grain(img, intensity=7.0)
     img.save(dest_path, "JPEG", quality=95)

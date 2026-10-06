@@ -187,6 +187,14 @@ def _render_kinetic_chunk_frame(
             except Exception:
                 pass
 
+    # Stylish translucent rounded pill behind the chunk to guarantee 100% contrast on any background
+    pad_x, pad_y = 26, 14
+    pill_x0 = start_x - pad_x
+    pill_y0 = base_y - font_size // 2 - pad_y
+    pill_x1 = start_x + total_w + pad_x
+    pill_y1 = base_y + font_size // 2 + pad_y
+    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=18, fill=(0, 0, 0, 160))
+
     # Draw Words horizontally with drop shadow
     curr_x = start_x
     for idx, (word, w_w) in enumerate(zip(words_in_chunk, word_widths)):
@@ -293,8 +301,8 @@ def _render_watermark_frame(
 def _build_kinetic_subtitle_clips(
     word_timings: list[WordTiming],
     output_width: int,
-    sub_canvas_h: int = 420,
-    sub_position_y: int = 1180,
+    sub_canvas_h: int = 360,
+    sub_position_y: int = 1320,
     words_per_chunk: int = 2,
 ) -> list[ImageClip]:
     """
@@ -341,8 +349,8 @@ def _build_subtitle_clips(
     audio_duration: float,
     output_width: int,
     words_per_chunk: int = 4,
-    sub_canvas_h: int = 480,
-    sub_position_y: int = 820,
+    sub_canvas_h: int = 360,
+    sub_position_y: int = 1320,
     word_timings: list[WordTiming] | None = None,
 ) -> list[ImageClip]:
     """
@@ -525,10 +533,12 @@ def _mix_audio_advanced(
     sfx_folder: str = "",
     scene_count: int = 1,
     enable_sfx: bool = True,
+    scenes_media: list[dict] | None = None,
 ) -> CompositeAudioClip | AudioFileClip:
     """
     Advanced sound designer:
     - Auto-ducks background music during speech
+    - Injects scene-aware documentary Foley SFX (stamps, paper slides, highlighters, tickers)
     - Injects subtle cinematic whoosh at scene transitions
     - Injects subtle impact boom at the beginning hook
     """
@@ -561,8 +571,39 @@ def _mix_audio_advanced(
                 impact_clip = AudioFileClip(sfx_map["impact"]).volumex(0.35).set_start(0.05)
                 audio_tracks.append(impact_clip)
 
-            # Soft subtle whoosh on scene cuts
-            if scene_count > 1 and "whoosh" in sfx_map and os.path.isfile(sfx_map["whoosh"]):
+            if scenes_media:
+                n_scenes = len(scenes_media)
+                scene_dur = total_duration / max(1, n_scenes)
+                curr_t = 0.0
+                for idx, sc in enumerate(scenes_media):
+                    s_fmt = sc.get("format", "")
+                    # Paper slide when physical documents appear
+                    if s_fmt in {"dossier", "newspaper"} and "paper_slide" in sfx_map and os.path.isfile(sfx_map["paper_slide"]):
+                        ps = AudioFileClip(sfx_map["paper_slide"]).volumex(0.32).set_start(curr_t + 0.05)
+                        audio_tracks.append(ps)
+                    # Stamp slam on classified FBI dossier
+                    if s_fmt == "dossier" and "stamp_thud" in sfx_map and os.path.isfile(sfx_map["stamp_thud"]):
+                        st = AudioFileClip(sfx_map["stamp_thud"]).volumex(0.55).set_start(curr_t + 0.45)
+                        audio_tracks.append(st)
+                    # Felt marker squeak on newspaper headline
+                    if s_fmt == "newspaper" and "highlighter" in sfx_map and os.path.isfile(sfx_map["highlighter"]):
+                        hl = AudioFileClip(sfx_map["highlighter"]).volumex(0.30).set_start(curr_t + 0.50)
+                        audio_tracks.append(hl)
+                    # Rapid ticker on counter card
+                    if s_fmt == "counter":
+                        if "ticker" in sfx_map and os.path.isfile(sfx_map["ticker"]):
+                            tk = AudioFileClip(sfx_map["ticker"]).volumex(0.40).set_start(curr_t + 0.10)
+                            audio_tracks.append(tk)
+                        if "impact" in sfx_map and os.path.isfile(sfx_map["impact"]):
+                            imp = AudioFileClip(sfx_map["impact"]).volumex(0.45).set_start(curr_t + 1.15)
+                            audio_tracks.append(imp)
+                    # Subtle whoosh on scene transition
+                    if idx > 0 and "whoosh" in sfx_map and os.path.isfile(sfx_map["whoosh"]):
+                        wh = AudioFileClip(sfx_map["whoosh"]).volumex(0.18).set_start(curr_t)
+                        audio_tracks.append(wh)
+
+                    curr_t += scene_dur
+            elif scene_count > 1 and "whoosh" in sfx_map and os.path.isfile(sfx_map["whoosh"]):
                 scene_interval = total_duration / scene_count
                 for sc in range(1, scene_count):
                     cut_time = sc * scene_interval
@@ -683,6 +724,7 @@ def compose_video(
         sfx_folder=sfx_folder,
         scene_count=scene_count,
         enable_sfx=enable_sfx,
+        scenes_media=getattr(media, "scenes_media", None),
     )
     bg = bg.set_audio(final_audio)
 

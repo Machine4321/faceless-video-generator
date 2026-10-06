@@ -334,43 +334,69 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
     word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
     return f"""\
-You are an elite viral documentary storyteller for YouTube Shorts and TikTok.
-Your videos consistently get millions of views by turning trending news and bizarre discoveries into high-tension thriller narratives.
+You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris level).
+Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all fluff and structure every second with psychological hooks.
 
-VIRAL TOPIC / EVENT TO COVER:
+VIRAL TOPIC / INVESTIGATION:
 Topic: {topic}
 Context & Details: {summary}
 
-TASK:
-1. Write an ultra-gripping viral short-form script (~{word_count} words).
-   Pacing & Structure:
-   - First sentence MUST be a pattern-interrupting In-Media-Res hook (under 12 words) that grabs the viewer in 1 second.
-   - Jump straight into the unbelievable anomaly, conflict, or twist.
-   - Build relentless tension with every sentence.
-   - Deliver an unexpected revelation or mind-bending conclusion at the end.
-   - Break the script into 5 to 7 sequential visual scenes (1-2 punchy sentences per scene).
-   - For each scene, specify:
-     * visual_query: vivid English visual description (e.g. "dark bank vault lasers", "police cars sirens")
-     * visual_format: "newspaper" (for headline/arrest/breaking event), "dossier" (for secrets/FBI files), "counter" (for money/amounts), or "ai_image" (for dramatic story scenes)
-     * sfx_cue: "impact", "whoosh", "glitch", "cash", or "heartbeat"
-
-2. ALL-CAPS VIRAL CLICKBAIT TITLE (under 8 words, ultra-compelling).
-3. Primary English fallback search keyword (1-2 words).
-4. 8-12 high-engagement hashtags (including #shorts, #trending, and topic tags).
+RETENTION RULES (MANDATORY):
+1. THE 1.5-SECOND PATTERN INTERRUPT:
+   - First sentence MUST start in-media-res with an unbelievable revelation, conflict, or classified leak (under 12 words).
+   - NEVER start with: "Did you know", "Imagine", "In this video", "Have you heard".
+2. MAXIMUM VISUAL CONTRAST (Multi-Format Diversity):
+   - Scene 1: "ai_image" (Ultra-cinematic 35mm film still setting the dark scene)
+   - Scene 2: "dossier" (Classified evidence / government memo with redacted details)
+   - Scene 3: "counter" (Shocking number, money amount, casualty count, or year)
+   - Scene 4: "newspaper" (Mass media coverage / explosive public headline)
+   - Scene 5: "video" or "ai_image" (The chilling conclusion / unanswered question)
+3. RELENTLESS PACING & LOOP:
+   - Keep total narration tight (~{word_count} words).
+   - Every sentence must advance the mystery.
+   - The final sentence must leave the viewer in shock or loop back seamlessly to the first sentence.
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
-  "title": "ALL-CAPS TITLE",
-  "script": "Full narrative text...",
-  "visual_search": "primary_keyword",
-  "tags": "#shorts #trending #viral",
+  "title": "ALL-CAPS VIRAL THRILLER TITLE",
+  "script": "Full narrative script...",
+  "visual_search": "primary_fallback_keyword",
+  "tags": "#shorts #trending #viral #mystery",
   "scenes": [
     {{
       "scene_id": 1,
       "narration": "First sentence matching the hook...",
-      "visual_query": "specific search phrase",
-      "visual_format": "newspaper",
+      "visual_query": "35mm cinematic photograph of ...",
+      "visual_format": "ai_image",
       "sfx_cue": "impact"
+    }},
+    {{
+      "scene_id": 2,
+      "narration": "Second sentence revealing the secret document...",
+      "visual_query": "classified memo details",
+      "visual_format": "dossier",
+      "sfx_cue": "paper_slide"
+    }},
+    {{
+      "scene_id": 3,
+      "narration": "Third sentence giving the unbelievable number...",
+      "visual_query": "financial records",
+      "visual_format": "counter",
+      "sfx_cue": "ticker"
+    }},
+    {{
+      "scene_id": 4,
+      "narration": "Fourth sentence showing the media reaction...",
+      "visual_query": "breaking news scandal",
+      "visual_format": "newspaper",
+      "sfx_cue": "highlighter"
+    }},
+    {{
+      "scene_id": 5,
+      "narration": "Final sentence delivering the punchline or cliffhanger...",
+      "visual_query": "dark eerie silhouette walking away",
+      "visual_format": "video",
+      "sfx_cue": "whoosh"
     }}
   ]
 }}"""

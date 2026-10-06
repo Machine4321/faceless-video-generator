@@ -154,6 +154,78 @@ def generate_heartbeat(duration: float = 0.85) -> np.ndarray:
     return audio / max_val * 0.9
 
 
+def generate_stamp_thud(duration: float = 0.55) -> np.ndarray:
+    """Generate a punchy wooden rubber stamp slam with a sub-bass thump."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+
+    # Sub-bass punch (rapid frequency slide 180Hz -> 42Hz)
+    freq = 42 + 138 * np.exp(-t * 22)
+    sub = np.sin(2 * np.pi * np.cumsum(freq) / SAMPLE_RATE) * np.exp(-t * 8.5)
+
+    # Transient wooden crack/snap
+    snap_len = int(SAMPLE_RATE * 0.035)
+    snap = np.zeros_like(t)
+    snap[:snap_len] = np.random.uniform(-1, 1, snap_len) * np.linspace(1, 0, snap_len) * np.sin(2 * np.pi * 680 * t[:snap_len])
+
+    audio = 0.75 * sub + 0.25 * snap
+    max_val = np.max(np.abs(audio)) or 1.0
+    return audio / max_val * 0.95
+
+
+def generate_paper_slide(duration: float = 0.38) -> np.ndarray:
+    """Generate a crisp paper sheet gliding/rustling onto an investigation desk."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+
+    noise = np.random.uniform(-1, 1, n_samples)
+    kernel = np.hanning(45)
+    kernel /= kernel.sum()
+    smooth_noise = np.convolve(noise, kernel, mode="same")
+
+    # Swell and decay envelope
+    env = np.sin(np.pi * t / duration) ** 1.8
+    audio = smooth_noise * env
+    max_val = np.max(np.abs(audio)) or 1.0
+    return audio / max_val * 0.45
+
+
+def generate_highlighter(duration: float = 0.75) -> np.ndarray:
+    """Generate a felt-tip marker friction squeak drawing across paper."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+
+    # Modulated high-frequency friction
+    squeak = np.sin(2 * np.pi * 1450 * t + np.sin(2 * np.pi * 35 * t) * 2.0)
+    noise = np.random.uniform(-1, 1, n_samples)
+    kernel = np.hanning(25)
+    kernel /= kernel.sum()
+    fric_noise = np.convolve(noise, kernel, mode="same")
+
+    env = np.sin(np.pi * t / duration) ** 1.2
+    audio = (0.35 * squeak + 0.65 * fric_noise) * env
+    max_val = np.max(np.abs(audio)) or 1.0
+    return audio / max_val * 0.35
+
+
+def generate_ticker(duration: float = 1.0) -> np.ndarray:
+    """Generate rapid mechanical/digital counter clicks for spinning stats."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+    ticker = np.zeros_like(t)
+
+    click_times = np.linspace(0.04, 0.92, 14)
+    for ct in click_times:
+        idx = int(ct * SAMPLE_RATE)
+        click_len = int(SAMPLE_RATE * 0.015)
+        if idx + click_len < n_samples:
+            tc = np.linspace(0, 0.015, click_len)
+            ticker[idx : idx + click_len] += np.sin(2 * np.pi * 3400 * tc) * np.exp(-tc * 380)
+
+    max_val = np.max(np.abs(ticker)) or 1.0
+    return ticker / max_val * 0.65
+
+
 def ensure_default_sfx(sfx_dir: str) -> dict[str, str]:
     """
     Ensure all standard sound effects exist in sfx_dir.
@@ -166,6 +238,10 @@ def ensure_default_sfx(sfx_dir: str) -> dict[str, str]:
         "cash": generate_cash,
         "glitch": generate_glitch,
         "heartbeat": generate_heartbeat,
+        "stamp_thud": generate_stamp_thud,
+        "paper_slide": generate_paper_slide,
+        "highlighter": generate_highlighter,
+        "ticker": generate_ticker,
     }
 
     sfx_paths: dict[str, str] = {}

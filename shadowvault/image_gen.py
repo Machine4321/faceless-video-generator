@@ -45,30 +45,35 @@ def generate_ai_image(
     full_prompt = f"{clean_prompt}, {CINEMATIC_SUFFIX}"
     encoded = urllib.parse.quote(full_prompt)
 
-    # Use Flux endpoint
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&model=flux"
+    # Try high-fidelity Flux first, fallback to ultra-fast Turbo if congested
+    endpoints = [
+        f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&model=flux",
+        f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}&model=turbo",
+        f"https://image.pollinations.ai/prompt/{encoded}?width={width}&height={height}",
+    ]
 
-    try:
-        logger.info("Generating AI visual: %r ...", clean_prompt[:60])
-        resp = requests.get(url, timeout=timeout)
-        if resp.status_code == 200 and len(resp.content) > 10_000:
-            with open(dest_path, "wb") as f:
-                f.write(resp.content)
+    for ep_url in endpoints:
+        try:
+            logger.info("Generating AI visual: %r ...", clean_prompt[:60])
+            resp = requests.get(ep_url, timeout=timeout)
+            if resp.status_code == 200 and len(resp.content) > 10_000:
+                with open(dest_path, "wb") as f:
+                    f.write(resp.content)
 
-            # Validate with PIL that it is a valid image
-            with Image.open(dest_path) as img:
-                img.verify()
+                # Validate with PIL that it is a valid image
+                with Image.open(dest_path) as img:
+                    img.verify()
 
-            logger.info("AI Image generated successfully -> %s (%d bytes)", dest_path, len(resp.content))
-            return True
-        else:
-            logger.warning("AI image generation returned status %d (size=%d)", resp.status_code, len(resp.content))
-            return False
-    except Exception as exc:
-        logger.warning("AI image generation failed (%s) - will fallback gracefully", exc)
-        if os.path.exists(dest_path):
-            try:
-                os.remove(dest_path)
-            except Exception:
-                pass
-        return False
+                logger.info("AI Image generated successfully -> %s (%d bytes)", dest_path, len(resp.content))
+                return True
+            else:
+                logger.warning("AI image generation endpoint returned status %d, trying fallback...", resp.status_code)
+        except Exception as exc:
+            logger.warning("AI image generation attempt failed (%s), trying fallback...", exc)
+
+    if os.path.exists(dest_path):
+        try:
+            os.remove(dest_path)
+        except Exception:
+            pass
+    return False
