@@ -275,7 +275,24 @@ def fetch_scene_media(
             except Exception:
                 pass
 
-    # 4. Custom 100% Unique AI Visual (Flux)
+    # 4. Documentary Graphic: Military / Scientific Radar Scope
+    if vformat == "radar":
+        try:
+            from shadowvault.graphics import render_radar_scope_frame
+            dest = os.path.join(temp_dir, f"scene_{scene.scene_id}_radar_{random.randint(1000, 9999)}.jpg")
+            render_radar_scope_frame(target_name=scene.visual_query or "ANOMALOUS PULSE", dest_path=dest)
+            logger.info("Generated military/scientific radar scope for scene %d", scene.scene_id)
+            return {
+                "scene_id": scene.scene_id,
+                "path": dest,
+                "type": "image",
+                "format": "radar",
+                "source_desc": f"Procedural Military Radar Scope (CRT Phosphor, Target: '{scene.visual_query}')",
+            }
+        except Exception as exc:
+            logger.warning("Radar scope graphic generation failed: %s", exc)
+
+    # 5. Custom 100% Unique AI Visual (Flux)
     if vformat in {"ai_image", "auto"}:
         try:
             from shadowvault.image_gen import generate_ai_image
@@ -292,13 +309,15 @@ def fetch_scene_media(
         except Exception as exc:
             logger.warning("AI image generation call failed: %s", exc)
 
-    # 5. Pexels Video (multi-tier query fallback)
+    # 6. Pexels Stock Video (Atmospheric & Texture Only - strictly no cheesy actors)
     if api_key and api_key != "fake-key" and not api_key.startswith("test"):
-        search_queries = [query]
-        words = query.split()
+        # Filter out cheesy actor/costume queries to keep documentary realism
+        clean_q = re.sub(r"\b(astronaut|actor|man|woman|person|people|posing|costume|walking away|silhouette)\b", "dark atmospheric", query, flags=re.I).strip()
+        search_queries = [clean_q]
+        words = clean_q.split()
         if len(words) > 2:
             search_queries.append(" ".join(words[:2]))
-        search_queries.append("cinematic vertical")
+        search_queries.append("dark cinematic texture vertical")
 
         for sq in search_queries:
             videos = _search_pexels(sq, api_key)

@@ -307,36 +307,51 @@ def _build_kinetic_subtitle_clips(
 ) -> list[ImageClip]:
     """
     Build word-by-word kinetic subtitle clips where active spoken words glow.
+    Guarantees strictly non-overlapping time intervals to prevent double-alpha background
+    strobe and visual flicker.
     """
     if not word_timings:
         return []
 
     clips: list[ImageClip] = []
-    # Group words into chunks of 2-3 words
+    # Group words into chunks of 2 words
     chunks: list[list[WordTiming]] = []
     for i in range(0, len(word_timings), words_per_chunk):
         chunks.append(word_timings[i : i + words_per_chunk])
 
     for chunk_idx, chunk in enumerate(chunks):
         words = [wt.word for wt in chunk]
+        chunk_start = chunk[0].start
+        chunk_end = max(chunk[-1].end, chunk_start + 0.30)
+
+        # Bridge micro-gap between chunks (<0.28s) so the subtitle box doesn't flicker away
+        if chunk_idx < len(chunks) - 1:
+            next_chunk_start = chunks[chunk_idx + 1][0].start
+            if 0 < next_chunk_start - chunk_end < 0.28:
+                chunk_end = next_chunk_start
+
+        # Calculate strictly non-overlapping start/end times for each word in this chunk
+        n_words = len(chunk)
+        word_starts: list[float] = []
+        word_ends: list[float] = []
+
+        curr_t = chunk_start
         for active_idx, wt in enumerate(chunk):
-            start = wt.start
-            # Bridge gap to next word in chunk so the subtitle box NEVER flickers off
-            if active_idx < len(chunk) - 1:
-                end = max(wt.end, chunk[active_idx + 1].start)
+            w_start = curr_t
+            if active_idx < n_words - 1:
+                next_raw_start = chunk[active_idx + 1].start
+                # Ensure each active word has at least 0.16s display time
+                w_end = max(w_start + 0.16, min(next_raw_start, chunk_end - 0.16))
             else:
-                # If gap to next chunk is small (<0.35s), hold subtitle continuously
-                if chunk_idx < len(chunks) - 1:
-                    next_start = chunks[chunk_idx + 1][0].start
-                    if 0 < next_start - wt.end < 0.35:
-                        end = next_start
-                    else:
-                        end = wt.end
-                else:
-                    end = wt.end
+                w_end = max(chunk_end, w_start + 0.16)
 
-            duration = max(0.12, end - start)
+            word_starts.append(w_start)
+            word_ends.append(w_end)
+            curr_t = w_end
 
+        # Render and attach clips with strict seamless boundaries
+        for active_idx, (w_start, w_end) in enumerate(zip(word_starts, word_ends)):
+            duration = max(0.12, w_end - w_start)
             try:
                 frame = _render_kinetic_chunk_frame(
                     words_in_chunk=words,
@@ -346,13 +361,13 @@ def _build_kinetic_subtitle_clips(
                 )
                 clip = (
                     ImageClip(frame)
-                    .set_start(start)
+                    .set_start(w_start)
                     .set_duration(duration)
                     .set_position(("center", sub_position_y))
                 )
                 clips.append(clip)
             except Exception as exc:
-                logger.warning("Failed to render kinetic word '%s': %s", wt.word, exc)
+                logger.warning("Failed to render kinetic word '%s': %s", words[active_idx], exc)
 
     return clips
 
@@ -610,6 +625,10 @@ def _mix_audio_advanced(
                         if "impact" in sfx_map and os.path.isfile(sfx_map["impact"]):
                             imp = AudioFileClip(sfx_map["impact"]).volumex(0.45).set_start(curr_t + 1.15)
                             audio_tracks.append(imp)
+                    # Radar / frequency ping on telemetry radar scope
+                    if s_fmt == "radar" and "radar_ping" in sfx_map and os.path.isfile(sfx_map["radar_ping"]):
+                        rp = AudioFileClip(sfx_map["radar_ping"]).volumex(0.38).set_start(curr_t + 0.12)
+                        audio_tracks.append(rp)
                     # Subtle whoosh on scene transition
                     if idx > 0 and "whoosh" in sfx_map and os.path.isfile(sfx_map["whoosh"]):
                         wh = AudioFileClip(sfx_map["whoosh"]).volumex(0.18).set_start(curr_t)

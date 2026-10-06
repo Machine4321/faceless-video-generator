@@ -226,6 +226,18 @@ def generate_ticker(duration: float = 1.0) -> np.ndarray:
     return ticker / max_val * 0.65
 
 
+def generate_radar_ping(duration: float = 0.95) -> np.ndarray:
+    """Generate an authentic high-tech sonar/radar ping with sub-bass resonance."""
+    n_samples = int(SAMPLE_RATE * duration)
+    t = np.linspace(0, duration, n_samples, endpoint=False)
+    # 1850 Hz pure acoustic ping with exponential decay
+    ping = np.sin(2 * np.pi * 1850 * t) * np.exp(-t * 5.8)
+    sub = np.sin(2 * np.pi * 280 * t) * np.exp(-t * 9.5)
+    audio = 0.75 * ping + 0.25 * sub
+    max_val = np.max(np.abs(audio)) or 1.0
+    return audio / max_val * 0.45
+
+
 def ensure_default_sfx(sfx_dir: str) -> dict[str, str]:
     """
     Ensure all standard sound effects exist in sfx_dir.
@@ -242,6 +254,7 @@ def ensure_default_sfx(sfx_dir: str) -> dict[str, str]:
         "paper_slide": generate_paper_slide,
         "highlighter": generate_highlighter,
         "ticker": generate_ticker,
+        "radar_ping": generate_radar_ping,
     }
 
     sfx_paths: dict[str, str] = {}

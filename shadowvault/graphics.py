@@ -12,6 +12,7 @@ Renders broadcast-quality 1080x1920 graphic frames:
 from __future__ import annotations
 
 import logging
+import math
 import os
 import random
 import re
@@ -531,5 +532,78 @@ def render_stat_counter_card(
     draw.text((width // 2, 980), "OFFICIALLY RECORDED EVIDENCE", fill=(160, 160, 160), font=font_sub, anchor="mm")
 
     img = add_film_grain(img, intensity=7.0)
+    img.save(dest_path, "JPEG", quality=95)
+    return dest_path
+
+
+def render_radar_scope_frame(
+    target_name: str = "UNEXPLAINED EMISSION",
+    coordinates: str = "RA 19h 28m // DEC -27° 00'",
+    dest_path: str = "",
+    width: int = 1080,
+    height: int = 1920,
+) -> str:
+    """
+    Render an authentic green-phosphor CRT radar/oscilloscope telemetry scope.
+    Used for deep space signals, military radar anomalies, and high-frequency tracking.
+    Positioned in upper-middle area (Y: 340 to 1200) to keep subtitles fully clear.
+    """
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    img = Image.new("RGB", (width, height), (10, 15, 14))
+    draw = ImageDraw.Draw(img)
+
+    cx, cy = width // 2, 780
+    r_max = 420
+
+    # Ambient deep green CRT glow
+    glow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    g_draw = ImageDraw.Draw(glow)
+    g_draw.ellipse([cx - r_max - 50, cy - r_max - 50, cx + r_max + 50, cy + r_max + 50], fill=(0, 255, 120, 24))
+    glow = glow.filter(ImageFilter.GaussianBlur(120))
+    img.paste(glow, (0, 0), glow)
+
+    # Tactical Outer Circle & Bezel
+    draw.ellipse([cx - r_max, cy - r_max, cx + r_max, cy + r_max], outline=(0, 255, 136, 180), width=4)
+    draw.ellipse([cx - r_max - 12, cy - r_max - 12, cx + r_max + 12, cy + r_max + 12], outline=(0, 255, 136, 70), width=2)
+
+    # Concentric Range Rings
+    for r in [130, 240, 330]:
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=(0, 200, 110, 80), width=1)
+
+    # Crosshair Axes & Degree Ticks
+    draw.line([(cx - r_max, cy), (cx + r_max, cy)], fill=(0, 220, 120, 90), width=1)
+    draw.line([(cx, cy - r_max), (cx, cy + r_max)], fill=(0, 220, 120, 90), width=1)
+    draw.line([(cx - int(r_max * 0.707), cy - int(r_max * 0.707)), (cx + int(r_max * 0.707), cy + int(r_max * 0.707))], fill=(0, 200, 110, 45), width=1)
+    draw.line([(cx - int(r_max * 0.707), cy + int(r_max * 0.707)), (cx + int(r_max * 0.707), cy - int(r_max * 0.707))], fill=(0, 200, 110, 45), width=1)
+
+    # Translucent Radar Sweep Sector
+    sweep = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(sweep)
+    s_draw.pieslice([cx - r_max, cy - r_max, cx + r_max, cy + r_max], start=-65, end=0, fill=(0, 255, 140, 45))
+    s_draw.line([(cx, cy), (cx + int(r_max * math.cos(0)), cy + int(r_max * math.sin(0)))], fill=(0, 255, 160, 220), width=3)
+    img.paste(sweep, (0, 0), sweep)
+
+    # Target Blip with reticle brackets
+    blip_x, blip_y = cx + 180, cy - 140
+    draw.ellipse([blip_x - 8, blip_y - 8, blip_x + 8, blip_y + 8], fill=(255, 50, 50, 255))
+    draw.rectangle([blip_x - 22, blip_y - 22, blip_x + 22, blip_y + 22], outline=(255, 80, 80, 200), width=2)
+
+    font_mono_sm = _load_font("mono", size=22, bold=True)
+    font_mono_md = _load_font("mono", size=26, bold=True)
+    font_hud_title = _load_font("mono", size=32, bold=True)
+
+    draw.text((blip_x + 30, blip_y - 12), "TARGET LOCK [+30 SIGMA]", fill=(255, 80, 80), font=font_mono_sm)
+
+    # Top HUD Telemetry
+    draw.text((width // 2, 220), "FREQUENCY SPECTRUM MONITOR", fill=(0, 255, 136), font=font_hud_title, anchor="mm")
+    draw.line([(width // 2 - 200, 250), (width // 2 + 200, 250)], fill=(0, 255, 136, 120), width=2)
+    draw.text((width // 2, 280), f"SIGNAL: {target_name.upper()[:36]}", fill=(190, 230, 210), font=font_mono_md, anchor="mm")
+
+    # Bottom HUD Telemetry
+    draw.text((width // 2, 1260), f"COORDINATES: {coordinates.upper()}", fill=(0, 255, 136), font=font_mono_md, anchor="mm")
+    draw.text((width // 2, 1300), "SIGNAL TYPE: NARROWBAND PULSE // UNIDENTIFIED", fill=(170, 200, 190), font=font_mono_sm, anchor="mm")
+
+    img = add_film_grain(img, intensity=8.0)
     img.save(dest_path, "JPEG", quality=95)
     return dest_path

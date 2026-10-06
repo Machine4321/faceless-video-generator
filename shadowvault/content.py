@@ -85,24 +85,31 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
             "Keep the delivery punchy, authoritative, and gripping."
         ),
         "fallback": ContentResult(
-            title="THE HISTORICAL GLITCH NOBODY CAN EXPLAIN",
+            title="THE 72-SECOND SIGNAL FROM DEEP UNCHARTED SPACE",
             script=(
-                "In July 1518, a woman stepped into a town square in France and began violently dancing. "
-                "Within days, hundreds of people joined her, unable to stop. "
-                "Doctors prescribed more dancing, claiming it would cure the fever. "
-                "Dozens died of exhaustion and heart attacks right in front of onlookers. "
-                "To this day, modern science cannot fully explain the dancing plague."
+                "On August 15, 1977, a radio telescope in Ohio intercepted an artificial signal from deep space. "
+                "It was thirty times louder than cosmic background noise. "
+                "The frequency was locked exactly to 1,420 megahertz, the hydrogen line. "
+                "Astronomer Jerry Ehman circled the code on a printout and scribbled 'Wow!'. "
+                "The signal broadcast continuously for seventy-two seconds. "
+                "Every satellite and military transmitter was ruled out. "
+                "For forty-nine years, telescopes have watched that exact coordinate. "
+                "The signal has never returned."
             ),
-            visual_search_keyword="ancient city fog mystery",
-            tags="#shorts #history #glitches #mystery #creepyfacts #viral",
+            visual_search_keyword="radio telescope deep space",
+            tags="#shorts #history #glitches #mystery #astronomy #viral",
             niche="glitches",
-            hook="In 1518, an entire city started dancing until they dropped dead.",
+            hook="On August 15, 1977, a radio telescope in Ohio intercepted an artificial signal from deep space.",
             scenes=[
-                ScenePlan(1, "In July 1518, a woman stepped into a town square in France and began violently dancing.", "medieval town cobblestone dramatic fog", "impact"),
-                ScenePlan(2, "Within days, hundreds of people joined her, unable to stop.", "crowd mysterious movement shadows silhouette", "whoosh"),
-                ScenePlan(3, "Doctors prescribed more dancing, claiming it would cure the fever.", "old parchment medical vintage archival", "whoosh"),
-                ScenePlan(4, "Dozens died of exhaustion and heart attacks right in front of onlookers.", "dramatic dark hospital vintage horror", "heartbeat"),
-                ScenePlan(5, "To this day, modern science cannot fully explain the dancing plague.", "ancient dusty library old books candle", "glitch"),
+                ScenePlan(1, "On August 15, 1977, a radio telescope intercepted an artificial signal from deep space.", "35mm archival photograph of Big Ear radio telescope at night", "impact", visual_format="ai_image"),
+                ScenePlan(2, "It was thirty times louder than cosmic background noise.", "oscilloscope green frequency pulse telemetry", "radar_ping", visual_format="radar"),
+                ScenePlan(3, "The frequency was locked to 1,420 megahertz.", "frequency 1420 mhz hydrogen line", "ticker", visual_format="counter"),
+                ScenePlan(4, "Astronomer Jerry Ehman circled the code and scribbled 'Wow!'.", "vintage dot matrix computer printout circled in red ink", "paper_slide", visual_format="dossier"),
+                ScenePlan(5, "The signal broadcast continuously for seventy-two seconds.", "72 seconds duration record", "ticker", visual_format="counter"),
+                ScenePlan(6, "Breaking headlines ignited global speculation overnight.", "astronomy breaking news discovery headline", "highlighter", visual_format="newspaper"),
+                ScenePlan(7, "Every satellite and military transmitter was completely ruled out.", "classified intelligence transmission report", "stamp_thud", visual_format="dossier"),
+                ScenePlan(8, "For forty-nine years, telescopes have watched that exact coordinate.", "deep space radio telescope dish pointing at stars night", "whoosh", visual_format="ai_image"),
+                ScenePlan(9, "The signal has never returned.", "dark cosmic void deep galaxy infinite loop", "impact", visual_format="ai_image"),
             ],
         ),
     },
@@ -301,15 +308,16 @@ def _build_prompt(niche: str, hook: str, length: str = "short") -> str:
 {cfg['style']}
 
 TASK:
-1. Write a viral short-form script that starts with: "{hook}"
-   Target total length: ~{word_count} words.
-   Story rules:
+1. Write a viral short-form investigative script that starts with: "{hook}"
+   Target total length: ~{word_count} words (~22-26 seconds spoken).
+   RETENTION & STORY RULES:
    - First sentence is the explosive hook (already given).
-   - In-media-res pacing (no slow introductions).
-   - Build relentless tension or curiosity with every sentence.
-   - Deliver an unexpected twist or punchline at the end.
-   - Break the script into 5 to 7 sequential scenes (each scene 1-2 punchy sentences).
-   - For each scene, provide a highly specific portrait stock footage search query and an optional SFX cue.
+   - In-media-res pacing (no slow introductions or filler).
+   - Build relentless tension and curiosity with every sentence.
+   - End with a chilling revelation or a seamless loop back to the hook.
+   - DOUBLE THE VISUAL RHYTHM: Divide the story into 8 to 11 sequential micro-scenes (each cut 4-8 words, ~1.8-2.2 seconds).
+   - Use high-contrast documentary formats across scenes: "ai_image", "radar", "dossier", "counter", "newspaper".
+   - NO generic stock actors or AI clichés.
 
 2. Write a short, ALL-CAPS clickbait title (under 10 words).
 3. Provide one primary English keyword for fallback background video.
@@ -325,36 +333,48 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
     {{
       "scene_id": 1,
       "narration": "First sentence matching the hook...",
-      "visual_query": "specific search phrase for pexels",
+      "visual_query": "cinematic 35mm archival photograph of ...",
+      "visual_format": "ai_image",
       "sfx_cue": "impact"
+    }},
+    {{
+      "scene_id": 2,
+      "narration": "Second fast micro-scene...",
+      "visual_query": "radar frequency monitor",
+      "visual_format": "radar",
+      "sfx_cue": "radar_ping"
     }}
+  ]
 }}"""
 
 
 def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
     word_count = WORD_COUNTS.get(length, WORD_COUNTS["short"])
     return f"""\
-You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris level).
-Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all fluff and structure every second with psychological hooks.
+You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris, Lemmino level).
+Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all generic AI fluff and structure every single second with rapid visual cuts and verifiable historical/scientific facts.
 
 VIRAL TOPIC / INVESTIGATION:
 Topic: {topic}
 Context & Details: {summary}
 
-RETENTION RULES (MANDATORY):
-1. THE 1.5-SECOND PATTERN INTERRUPT:
-   - First sentence MUST start in-media-res with an unbelievable revelation, conflict, or classified leak (under 12 words).
-   - NEVER start with: "Did you know", "Imagine", "In this video", "Have you heard".
-2. MAXIMUM VISUAL CONTRAST (Multi-Format Diversity):
-   - Scene 1: "ai_image" (Ultra-cinematic 35mm film still setting the dark scene)
-   - Scene 2: "dossier" (Classified evidence / government memo with redacted details)
-   - Scene 3: "counter" (Shocking number, money amount, casualty count, or year)
-   - Scene 4: "newspaper" (Mass media coverage / explosive public headline)
-   - Scene 5: "video" or "ai_image" (The chilling conclusion / unanswered question)
-3. RELENTLESS PACING & LOOP:
-   - Keep total narration tight (~{word_count} words).
-   - Every sentence must advance the mystery.
-   - The final sentence must leave the viewer in shock or loop back seamlessly to the first sentence.
+MANDATORY JOURNALISTIC & RETENTION RULES:
+1. ZERO AI CLICHÉS (STRICTLY BANNED):
+   - NEVER use: "Did you know", "Imagine", "NASA hid the truth", "they don't want you to know", "fed a lie", "leaving us to wonder", "shocking secret", "unravel the mystery".
+   - Write like a top-tier investigative journalist: cite exact years, exact locations, observatory/probe codenames, exact frequencies (e.g. 1,420 MHz), exact numbers, and verified documents.
+2. DOUBLED VISUAL RHYTHM (8 to 11 FAST-PACED MICRO-SCENES):
+   - Modern viewers drop off if a scene holds longer than 2.2 seconds.
+   - Break the script into 8 to 11 sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.2 seconds).
+   - High visual contrast across scenes:
+     * "ai_image": Ultra-realistic 35mm film photograph, macro archival lens, grainy spy satellite, or dark laboratory.
+     * "radar": Military/scientific CRT radar scope or frequency telemetry monitor.
+     * "dossier": Physical classified FBI/CIA memo on tactical desk with red TOP SECRET stamp slam and redaction bars.
+     * "counter": Animated rising number / metric ticker (years, frequency, dollars, distance).
+     * "newspaper": Archival newspaper headline with fluorescent yellow highlighter wipe.
+3. RELENTLESS PACING & SEAMLESS LOOP:
+   - Total narration: ~{word_count} words (~22-26 seconds).
+   - The cold open starts immediately in-media-res with an unbelievable recorded fact.
+   - The final sentence delivers a bone-chilling twist or connects back seamlessly to the first sentence for infinite loop retention.
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
@@ -366,60 +386,99 @@ RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
     {{
       "scene_id": 1,
       "narration": "First sentence matching the hook...",
-      "visual_query": "35mm cinematic photograph of ...",
+      "visual_query": "35mm archival photograph of ...",
       "visual_format": "ai_image",
       "sfx_cue": "impact"
     }},
     {{
       "scene_id": 2,
-      "narration": "Second sentence revealing the secret document...",
-      "visual_query": "classified memo details",
-      "visual_format": "dossier",
-      "sfx_cue": "paper_slide"
+      "narration": "Exact measurement or instrument reading...",
+      "visual_query": "green CRT frequency monitor",
+      "visual_format": "radar",
+      "sfx_cue": "radar_ping"
     }},
     {{
       "scene_id": 3,
-      "narration": "Third sentence giving the unbelievable number...",
-      "visual_query": "financial records",
+      "narration": "Classified memo or official denial...",
+      "visual_query": "classified memo details",
+      "visual_format": "dossier",
+      "sfx_cue": "stamp_thud"
+    }},
+    {{
+      "scene_id": 4,
+      "narration": "Macro look at the physical evidence...",
+      "visual_query": "macro close up of vintage magnetic tape audio spool",
+      "visual_format": "ai_image",
+      "sfx_cue": "paper_slide"
+    }},
+    {{
+      "scene_id": 5,
+      "narration": "The shocking number or metric recorded...",
+      "visual_query": "recorded metric",
       "visual_format": "counter",
       "sfx_cue": "ticker"
     }},
     {{
-      "scene_id": 4,
-      "narration": "Fourth sentence showing the media reaction...",
-      "visual_query": "breaking news scandal",
+      "scene_id": 6,
+      "narration": "Breaking headline as details leaked...",
+      "visual_query": "breaking news investigation",
       "visual_format": "newspaper",
       "sfx_cue": "highlighter"
     }},
     {{
-      "scene_id": 5,
-      "narration": "Final sentence delivering the punchline or cliffhanger...",
-      "visual_query": "dark eerie silhouette walking away",
-      "visual_format": "video",
+      "scene_id": 7,
+      "narration": "The deep unexplained anomaly...",
+      "visual_query": "dark eerie telescopic deep space photography",
+      "visual_format": "ai_image",
       "sfx_cue": "whoosh"
+    }},
+    {{
+      "scene_id": 8,
+      "narration": "Final chilling twist that loops to the start...",
+      "visual_query": "mysterious vintage archive room silhouette",
+      "visual_format": "ai_image",
+      "sfx_cue": "impact"
     }}
   ]
 }}"""
 
 
 def _split_into_scenes(script: str, default_keyword: str) -> list[ScenePlan]:
-    """Helper to auto-split a plain script into 4-6 sequential scenes if scenes not provided."""
-    sentences = re.split(r"(?<=[.!?])\s+", script.strip())
-    sentences = [s.strip() for s in sentences if s.strip()]
-    if not sentences:
-        return [ScenePlan(1, script, default_keyword, "impact")]
+    """Auto-split a plain script into 8-11 fast-paced micro-scenes (1.8-2.2s cuts) with alternating formats."""
+    # Split on sentence boundaries and major clauses (dashes, semicolons)
+    raw_parts = re.split(r"(?<=[.!?])\s+|(?<=[—;:])\s+", script.strip())
+    parts = [p.strip() for p in raw_parts if p.strip()]
+
+    # If sentences are long (>10 words), subdivide them into 5-8 word punchy micro-beats
+    refined_parts: list[str] = []
+    for part in parts:
+        words = part.split()
+        if len(words) > 10:
+            mid = len(words) // 2
+            refined_parts.append(" ".join(words[:mid]))
+            refined_parts.append(" ".join(words[mid:]))
+        else:
+            refined_parts.append(part)
+
+    if not refined_parts:
+        refined_parts = [script]
+
+    format_cycle = ["ai_image", "radar", "dossier", "ai_image", "counter", "newspaper", "ai_image", "dossier", "radar", "ai_image"]
+    sfx_cycle = ["impact", "radar_ping", "stamp_thud", "paper_slide", "ticker", "highlighter", "whoosh", "paper_slide", "whoosh", "impact"]
 
     scenes: list[ScenePlan] = []
-    for idx, sentence in enumerate(sentences, start=1):
-        cue = "impact" if idx == 1 else ("whoosh" if idx < len(sentences) else "impact")
-        words = [re.sub(r"[^\w]", "", w).lower() for w in sentence.split()]
+    for idx, clause in enumerate(refined_parts, start=1):
+        vformat = format_cycle[(idx - 1) % len(format_cycle)]
+        cue = sfx_cycle[(idx - 1) % len(sfx_cycle)]
+
+        words = [re.sub(r"[^\w]", "", w).lower() for w in clause.split()]
         filtered = [w for w in words if len(w) > 4 and w not in {"there", "their", "about", "would", "could", "should", "every", "before"}]
         query = " ".join(filtered[:3]) if filtered else default_keyword
-        vformat = "newspaper" if idx == 1 else ("dossier" if idx == 3 else "ai_image")
+
         scenes.append(
             ScenePlan(
                 scene_id=idx,
-                narration=sentence,
+                narration=clause,
                 visual_query=query,
                 sfx_cue=cue,
                 visual_format=vformat,

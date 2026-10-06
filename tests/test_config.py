@@ -45,7 +45,7 @@ def test_valid_config_loads(monkeypatch, _set_required_env):
 
 def test_default_values(monkeypatch, _set_required_env):
     cfg = load_config()
-    assert cfg.tts_voice == "en-US-ChristopherNeural"
+    assert cfg.tts_voice == "en-US-BrianMultilingualNeural"
     assert cfg.fps == 24
     assert cfg.output_width == 1080
     assert cfg.output_height == 1920

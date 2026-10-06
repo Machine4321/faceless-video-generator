@@ -210,6 +210,7 @@ the TikTok Sound Algorithm for additional organic viral push.
     * sfx/paper_slide.wav  (Physical archival paper slide on desk)
     * sfx/highlighter.wav  (Chisel-tip marker highlight swipe)
     * sfx/ticker.wav       (Mechanical counter click)
+    * sfx/radar_ping.wav   (Tactical radar & frequency scope acoustic ping)
 ================================================================================
 """
     return report
@@ -223,7 +224,8 @@ def write_metadata_file(run: PipelineRun, output_dir: Optional[str] = None) -> s
     if output_dir is None:
         from shadowvault.config import get_config
         try:
-            output_dir = get_config().output_dir
+            cfg = get_config()
+            output_dir = getattr(cfg, "output_folder", getattr(cfg, "output_dir", "output"))
         except Exception:
             output_dir = "output"
 
@@ -253,7 +255,7 @@ def print_metadata_summary(run: PipelineRun) -> None:
     summary_lines = [
         "",
         "=" * 65,
-        "[METADATA] VIDEO & PROVENANCE SUMMARY",
+        "[METADATA] VIDEO METADATA & PROVENANCE SUMMARY",
         "=" * 65,
         f"Video File    : {os.path.basename(run.video.video_path) if run.video else 'N/A'}",
         f"Metadata File : {run.metadata_path or 'N/A'}",

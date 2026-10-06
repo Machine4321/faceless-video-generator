@@ -62,9 +62,9 @@ class Config:
 
     # --- TTS ---
     tts_provider: str = "edge"  # "edge" or "elevenlabs"
-    tts_voice: str = "en-US-ChristopherNeural"
-    tts_rate: str = "-6%"
-    tts_pitch: str = "-5Hz"
+    tts_voice: str = "en-US-BrianMultilingualNeural"
+    tts_rate: str = "+0%"
+    tts_pitch: str = "+0Hz"
     elevenlabs_voice_id: str = "pNInz6obpgq5paNsJ7vm"
 
     # --- Gemini ---
@@ -123,9 +123,9 @@ def load_config() -> Config:
         pixabay_api_key=_env("PIXABAY_API_KEY"),
         elevenlabs_api_key=_env("ELEVENLABS_API_KEY"),
         tts_provider=_env("TTS_PROVIDER", "edge"),
-        tts_voice=_env("TTS_VOICE", "en-US-ChristopherNeural"),
-        tts_rate=_env("TTS_RATE", "-6%"),
-        tts_pitch=_env("TTS_PITCH", "-5Hz"),
+        tts_voice=_env("TTS_VOICE", "en-US-BrianMultilingualNeural"),
+        tts_rate=_env("TTS_RATE", "+0%"),
+        tts_pitch=_env("TTS_PITCH", "+0Hz"),
         elevenlabs_voice_id=_env("ELEVENLABS_VOICE_ID", "pNInz6obpgq5paNsJ7vm"),
         gemini_model=_env("GEMINI_MODEL", "gemini-3.5-flash"),
         output_width=_env_int("OUTPUT_WIDTH", 1080),

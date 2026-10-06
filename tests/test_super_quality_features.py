@@ -233,3 +233,66 @@ class TestWatermarkAndTrends:
         assert "YOUNGEST EXOPLANET" in res.title.upper()
         assert len(res.scenes) >= 3
 
+
+class TestRadarAndPacingEnhancements:
+    def test_radar_ping_sfx_generation(self):
+        from shadowvault.utils.sfx_generator import generate_radar_ping
+        audio = generate_radar_ping(0.5)
+        assert isinstance(audio, np.ndarray)
+        assert len(audio) > 1000
+        assert np.max(np.abs(audio)) <= 1.0
+
+    def test_render_radar_scope_frame(self, tmp_path):
+        from shadowvault.graphics import render_radar_scope_frame
+        dest = str(tmp_path / "radar.jpg")
+        out = render_radar_scope_frame(target_name="TEST SIGNAL", dest_path=dest)
+        assert os.path.isfile(out)
+        assert os.path.getsize(out) > 5000
+
+    def test_fetch_scene_media_radar_format(self, tmp_path):
+        scene = ScenePlan(
+            scene_id=2,
+            narration="A strange signal was detected.",
+            visual_query="deep space frequency",
+            visual_format="radar",
+        )
+        res = fetch_scene_media(scene, str(tmp_path), api_key="fake-key")
+        assert res["format"] == "radar"
+        assert res["type"] == "image"
+        assert os.path.isfile(res["path"])
+
+    def test_kinetic_subtitles_strict_non_overlapping(self):
+        timings = [
+            WordTiming("LEAKED", 0.50, 0.85),
+            WordTiming("SENATE", 0.80, 1.20),
+            WordTiming("MEMO", 1.25, 1.60),
+            WordTiming("REVEALED", 1.55, 2.00),
+        ]
+        clips = _build_kinetic_subtitle_clips(timings, output_width=1080)
+        assert len(clips) == 4
+        # Verify strict non-overlapping constraint: clip[i] end <= clip[i+1] start
+        for i in range(len(clips) - 1):
+            c_curr = clips[i]
+            c_next = clips[i + 1]
+            curr_end = c_curr.start + c_curr.duration
+            next_start = c_next.start
+            assert curr_end <= next_start + 1e-4, f"Clips {i} and {i+1} overlap! {curr_end} > {next_start}"
+
+    def test_split_into_scenes_doubled_rhythm(self):
+        from shadowvault.content import _split_into_scenes
+        script = (
+            "On August 15, 1977, a radio telescope in Ohio intercepted an artificial signal from deep space. "
+            "It was thirty times louder than cosmic background noise. "
+            "The frequency was locked exactly to 1,420 megahertz, the hydrogen line. "
+            "Astronomer Jerry Ehman circled the code on a printout and scribbled Wow. "
+            "The signal broadcast continuously for seventy-two seconds."
+        )
+        scenes = _split_into_scenes(script, "deep space")
+        # Should produce 8 or more micro-scenes for doubled visual rhythm
+        assert len(scenes) >= 8
+        formats = {s.visual_format for s in scenes}
+        assert "radar" in formats
+        assert "dossier" in formats
+        assert "ai_image" in formats
+
+
