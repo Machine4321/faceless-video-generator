@@ -716,6 +716,7 @@ def compose_video(
             codec=codec,
             audio_codec="aac",
             preset=preset,
+            bitrate="3500k",
             threads=4,
             logger=None,
         )
