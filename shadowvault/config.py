@@ -68,7 +68,7 @@ class Config:
     elevenlabs_voice_id: str = "pNInz6obpgq5paNsJ7vm"
 
     # --- Gemini ---
-    gemini_model: str = "gemini-3.5-flash"
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     # --- Video ---
     output_width: int = 1080

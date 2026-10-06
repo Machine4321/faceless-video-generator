@@ -581,26 +581,31 @@ def generate_content(
         prompt = _build_prompt(niche, hook, length)
         logger.info("Generating content | niche=%s length=%s", niche, length)
 
+    models_to_try = [model]
+    for m in ["gemini-3.5-flash-lite", "gemini-3.5-flash"]:
+        if m not in models_to_try:
+            models_to_try.append(m)
+
     try:
         from google import genai
         client = genai.Client(api_key=api_key)
 
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt,
-        )
-
-        raw_text: str = response.text
-        logger.debug("Gemini raw response: %s", raw_text[:200])
-
-        result = _parse_response(raw_text, niche, hook)
-        logger.info("Content generated: title=%r (scenes=%d)", result.title, len(result.scenes))
-        return result
-
-    except json.JSONDecodeError as exc:
-        logger.warning("Gemini returned invalid JSON (%s) - using fallback", exc)
+        for m_candidate in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=m_candidate,
+                    contents=prompt,
+                )
+                raw_text = response.text
+                result = _parse_response(raw_text, niche, hook)
+                logger.info("Content generated via %s: title=%r (scenes=%d)", m_candidate, result.title, len(result.scenes))
+                return result
+            except json.JSONDecodeError as exc:
+                logger.warning("Gemini model %s returned invalid JSON (%s)", m_candidate, exc)
+            except Exception as exc:
+                logger.warning("Gemini error on model %s (%s) - trying fallback model", m_candidate, exc)
     except Exception as exc:
-        logger.warning("Gemini API error (%s) - using fallback", exc)
+        logger.warning("Gemini client initialization error (%s) - using fallback", exc)
 
     if topic is not None:
         # Dynamic fallback for trend topics
