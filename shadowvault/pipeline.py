@@ -19,7 +19,7 @@ import re
 import sys
 from typing import Optional
 
-from shadowvault.models import PipelineRun
+from shadowvault.models import PipelineRun, TrendingTopic
 from shadowvault import content as content_stage
 from shadowvault import media as media_stage
 from shadowvault import audio as audio_stage
@@ -97,7 +97,12 @@ async def run_once(
         if getattr(run.content, "scenes", None) and len(run.content.scenes) > 1:
             primary = run.content.visual_search_keyword
             if chosen_topic:
-                topic_str = chosen_topic.title if hasattr(chosen_topic, "title") else str(chosen_topic)
+                if isinstance(chosen_topic, TrendingTopic):
+                    topic_str = chosen_topic.title
+                elif isinstance(chosen_topic, str):
+                    topic_str = chosen_topic
+                else:
+                    topic_str = str(chosen_topic)
                 stop_and_jargon = {
                     "the", "a", "an", "that", "this", "these", "those", "and", "or", "in", "on", "at",
                     "to", "for", "of", "with", "by", "from", "yes", "no", "heres", "why", "there",
