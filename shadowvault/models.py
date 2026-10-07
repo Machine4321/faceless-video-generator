@@ -40,6 +40,8 @@ class ContentResult:
     tags: str
     niche: str = "horror"
     hook: str = ""
+    hook_header: str = ""      # 3-6 word uppercase visual hook badge with emoji (e.g. "THE $100M APPLE HEIST 🍏🔒")
+    hook_category: str = ""    # Category eyebrow tag for banner (e.g. "CLASSIFIED CASE", "TRUE CRIME ARCHIVE")
     scenes: list[ScenePlan] = field(default_factory=list)
 
 

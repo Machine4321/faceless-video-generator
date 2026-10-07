@@ -149,6 +149,8 @@ async def run_once(
                 title=run.content.title,
                 watermark_handle=watermark,
                 enable_sfx=(not no_sfx),
+                hook_header=getattr(run.content, "hook_header", None),
+                hook_category=getattr(run.content, "hook_category", None),
             ),
         )
         logger.info("[4/5] Done | output=%s", run.video.video_path)

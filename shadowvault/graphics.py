@@ -833,3 +833,101 @@ def render_radar_scope_frame(
     img = add_film_grain(img, intensity=8.0)
     img.save(dest_path, "JPEG", quality=95)
     return dest_path
+
+
+def render_hook_banner_frame(
+    headline: str,
+    category: str = "CLASSIFIED CASE",
+    canvas_w: int = 1080,
+    canvas_h: int = 1920,
+    center_y: int = 340,
+    font_size: int = 54,
+    theme: str = "yellow_black",
+) -> np.ndarray:
+    """
+    Render a high-retention neuromarketing Hook Banner overlay for the opening 0-4 seconds.
+    Features:
+    - High-contrast caution badge design with deep carbon background and glowing electric border
+    - Crimson red 'CLASSIFIED / EVIDENCE' pill tag anchored above headline
+    - Heavy drop-shadow for instant separation from any video background
+    - Safe from TikTok / YouTube Shorts UI margins (y = 260 to 480)
+    """
+    img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    dummy = ImageDraw.Draw(img)
+
+    clean_head = re.sub(r"[^\x00-\x7F\u00A0-\u00FF]+", "", headline).strip().upper()
+    clean_head = re.sub(r"\s+", " ", clean_head)
+    lines = textwrap.wrap(clean_head, width=20)
+    if not lines:
+        lines = [clean_head] if clean_head else ["CLASSIFIED EVIDENCE"]
+
+    clean_category = re.sub(r"[^\x00-\x7F\u00A0-\u00FF]+", "", category).strip().upper()
+    clean_category = re.sub(r"\s+", " ", clean_category) if clean_category else "CLASSIFIED CASE"
+
+    font_head = _load_font("sans", size=font_size, bold=True)
+    font_pill = _load_font("sans", size=26, bold=True)
+
+    line_bboxes = [dummy.textbbox((0, 0), line, font=font_head, stroke_width=4) for line in lines]
+    line_widths = [b[2] - b[0] for b in line_bboxes]
+    line_heights = [b[3] - b[1] for b in line_bboxes]
+    line_spacing = 10
+    total_text_h = sum(line_heights) + line_spacing * (len(lines) - 1)
+    max_text_w = max(line_widths)
+
+    box_pad_x = 44
+    box_pad_y = 26
+    box_w = min(canvas_w - 80, max(max_text_w + box_pad_x * 2, 560))
+    box_h = total_text_h + box_pad_y * 2
+
+    box_x0 = (canvas_w - box_w) // 2
+    box_y0 = center_y - box_h // 2
+    box_x1 = box_x0 + box_w
+    box_y1 = box_y0 + box_h
+
+    # Eyebrow Pill Tag
+    pill_text = f"● {clean_category}" if clean_category else "● CLASSIFIED FILE"
+    p_bbox = dummy.textbbox((0, 0), pill_text, font=font_pill)
+    pill_w = (p_bbox[2] - p_bbox[0]) + 36
+    pill_h = (p_bbox[3] - p_bbox[1]) + 16
+    pill_x0 = (canvas_w - pill_w) // 2
+    pill_y0 = box_y0 - pill_h // 2
+    pill_x1 = pill_x0 + pill_w
+    pill_y1 = pill_y0 + pill_h
+
+    # Drop shadow behind card
+    shadow = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+    s_draw = ImageDraw.Draw(shadow)
+    s_draw.rounded_rectangle([box_x0 - 6, box_y0 + 10, box_x1 + 6, box_y1 + 18], radius=24, fill=(0, 0, 0, 195))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(16))
+    img.paste(shadow, (0, 0), shadow)
+
+    draw = ImageDraw.Draw(img)
+
+    # Main Card Box
+    card_fill = (12, 14, 20, 245)
+    border_color = (255, 229, 0, 255) if theme == "yellow_black" else (255, 45, 45, 255)
+    draw.rounded_rectangle([box_x0, box_y0, box_x1, box_y1], radius=22, fill=card_fill, outline=border_color, width=4)
+    draw.rounded_rectangle([box_x0 + 4, box_y0 + 4, box_x1 - 4, box_y1 - 4], radius=18, outline=(border_color[0], border_color[1], border_color[2], 70), width=1)
+
+    # Pill Tag Box
+    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=pill_h // 2, fill=(225, 28, 38, 255), outline=(255, 255, 255, 220), width=2)
+    draw.text((canvas_w // 2, (pill_y0 + pill_y1) // 2 - 1), pill_text, font=font_pill, fill=(255, 255, 255), anchor="mm")
+
+    # Text Lines
+    text_color = (255, 229, 0) if theme == "yellow_black" else (255, 255, 255)
+    curr_y = box_y0 + box_pad_y + line_heights[0] // 2 + 8
+    for idx, line in enumerate(lines):
+        draw.text(
+            (canvas_w // 2, curr_y),
+            line,
+            font=font_head,
+            fill=text_color,
+            anchor="mm",
+            stroke_width=4,
+            stroke_fill=(0, 0, 0, 255),
+        )
+        if idx < len(lines) - 1:
+            curr_y += line_heights[idx] + line_spacing
+
+    return np.array(img)
+

@@ -444,6 +444,39 @@ def _build_subtitle_clips(
     return clips
 
 
+def _build_hook_banner_clip(
+    hook_header: str,
+    hook_category: str = "CLASSIFIED CASE",
+    duration: float = 3.6,
+    output_width: int = 1080,
+    output_height: int = 1920,
+) -> Optional[ImageClip]:
+    """
+    Build an animated high-contrast neuromarketing Hook Banner clip for the opening 0-4s.
+    """
+    if not hook_header or not hook_header.strip():
+        return None
+    try:
+        from shadowvault.graphics import render_hook_banner_frame
+        frame = render_hook_banner_frame(
+            headline=hook_header,
+            category=hook_category,
+            canvas_w=output_width,
+            canvas_h=output_height,
+        )
+        clip = (
+            ImageClip(frame)
+            .set_start(0.0)
+            .set_duration(duration)
+            .crossfadeout(0.35)
+        )
+        return clip
+    except Exception as exc:
+        logger.warning("Failed to render hook banner clip: %s", exc)
+        return None
+
+
+
 # ---------------------------------------------------------------------------
 # Ken Burns Image Animator & Multi-Scene Assembler
 # ---------------------------------------------------------------------------
@@ -454,27 +487,32 @@ def _create_ken_burns_clip(
     target_w: int = 1080,
     target_h: int = 1920,
     zoom_in: bool = True,
+    punch_zoom: bool = False,
 ) -> ImageClip:
     """
     Create a cinematic Ken Burns zoom clip from a static high-res photo.
+    Supports punch_zoom for aggressive forward motion in opening hook scenes.
     """
     img = Image.open(image_path).convert("RGB")
     img_w, img_h = img.size
 
-    # Ensure image covers vertical canvas with extra 15% margin for zoom
-    scale = max((target_w * 1.15) / img_w, (target_h * 1.15) / img_h)
+    # Ensure image covers vertical canvas with extra 18% margin for dynamic zoom
+    margin = 1.22 if punch_zoom else 1.15
+    scale = max((target_w * margin) / img_w, (target_h * margin) / img_h)
     new_w, new_h = int(img_w * scale), int(img_h * scale)
     img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
-    # Center crop to target_w * 1.15, target_h * 1.15
-    left = (new_w - int(target_w * 1.15)) // 2
-    top = (new_h - int(target_h * 1.15)) // 2
-    img_cropped = img_resized.crop((left, top, left + int(target_w * 1.15), top + int(target_h * 1.15)))
+    # Center crop to target_w * margin, target_h * margin
+    left = (new_w - int(target_w * margin)) // 2
+    top = (new_h - int(target_h * margin)) // 2
+    img_cropped = img_resized.crop((left, top, left + int(target_w * margin), top + int(target_h * margin)))
 
     clip = ImageClip(np.array(img_cropped)).set_duration(duration)
 
-    # Apply smooth continuous zoom
-    if zoom_in:
+    # Apply dynamic zoom: aggressive punch zoom for scene 1, smooth drift for later scenes
+    if punch_zoom:
+        zoomed = clip.resize(lambda t: 1.08 + 0.16 * min(1.0, (t / max(duration, 0.1)) ** 0.55))
+    elif zoom_in:
         zoomed = clip.resize(lambda t: 1.0 + 0.12 * (t / max(duration, 0.1)))
     else:
         zoomed = clip.resize(lambda t: 1.12 - 0.12 * (t / max(duration, 0.1)))
@@ -597,7 +635,11 @@ def _build_multi_scene_background(
         if os.path.isfile(path):
             try:
                 zoom_dir = (idx % 2 == 0)  # Alternate zoom in and zoom out
-                clip = _create_ken_burns_clip(path, scene_dur, output_width, output_height, zoom_in=zoom_dir)
+                clip = _create_ken_burns_clip(
+                    path, scene_dur, output_width, output_height,
+                    zoom_in=zoom_dir,
+                    punch_zoom=(idx == 0),
+                )
                 clips.append(clip)
                 continue
             except Exception as exc:
@@ -722,9 +764,9 @@ def _mix_audio_advanced(
     if enable_sfx and sfx_folder and os.path.isdir(sfx_folder):
         sfx_map = ensure_default_sfx(sfx_folder)
         try:
-            # Subtle hook impact boom at t = 0.05s
+            # Acoustic startle punch at t = 0.0s for instantaneous hook attention
             if "impact" in sfx_map and os.path.isfile(sfx_map["impact"]):
-                impact_clip = AudioFileClip(sfx_map["impact"]).volumex(0.35).set_start(0.05)
+                impact_clip = AudioFileClip(sfx_map["impact"]).volumex(0.65).set_start(0.0)
                 audio_tracks.append(impact_clip)
 
             if scenes_media:
@@ -807,6 +849,8 @@ def compose_video(
     sfx_folder: str | None = None,
     watermark_handle: str | None = None,
     enable_sfx: bool = True,
+    hook_header: str | None = None,
+    hook_category: str | None = None,
 ) -> VideoResult:
     """
     Compose the final high-retention vertical Short from all fetched assets.
@@ -899,8 +943,29 @@ def compose_video(
         word_timings=getattr(audio, "word_timings", None),
     )
 
-    # 4. Clean Watermark Overlay (Only added if explicitly configured)
+    # 4. Neuromarketing Hook Banner Overlay (0-4 seconds pattern interrupt)
+    hook_clip = None
+    if hook_header and hook_header.strip():
+        hook_dur = 3.6
+        if getattr(media, "scenes_media", None) and len(media.scenes_media) > 0:
+            durations = _compute_scene_durations(
+                media.scenes_media, getattr(audio, "word_timings", None), total_duration
+            )
+            if durations:
+                hook_dur = min(4.2, max(2.6, durations[0]))
+        hook_clip = _build_hook_banner_clip(
+            hook_header=hook_header.strip(),
+            hook_category=hook_category or "CLASSIFIED CASE",
+            duration=hook_dur,
+            output_width=output_width,
+            output_height=output_height,
+        )
+
     all_layers = [bg] + sub_clips
+    if hook_clip is not None:
+        all_layers.append(hook_clip)
+
+    # 5. Clean Watermark Overlay (Only added if explicitly configured)
     if watermark_handle and watermark_handle.strip():
         watermark_frame = _render_watermark_frame(output_width, output_height, handle=watermark_handle.strip())
         watermark_clip = (

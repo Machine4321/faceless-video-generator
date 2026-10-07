@@ -190,3 +190,28 @@ class TestParseResponseEdgeCases:
         })
         result = _parse_response(raw, "horror", "hook")
         assert result.title == "T"
+
+    def test_parses_explicit_hook_header_and_category(self):
+        raw = json.dumps({
+            "title": "HOW AN APPLE CRACKED A VAULT",
+            "hook_header": "THE $100M APPLE HEIST 🍏🔒",
+            "hook_category": "TRUE CRIME ARCHIVE",
+            "script": "He stole $100M with an apple.",
+            "visual_search": "vault",
+            "tags": "#shorts #heist",
+        })
+        result = _parse_response(raw, "heists", "hook")
+        assert result.hook_header == "THE $100M APPLE HEIST 🍏🔒"
+        assert result.hook_category == "TRUE CRIME ARCHIVE"
+
+    def test_synthesizes_fallback_hook_header_when_omitted(self):
+        raw = json.dumps({
+            "title": "HOW AN APPLE CRACKED A VAULT",
+            "script": "He stole $100M with an apple.",
+            "visual_search": "vault",
+            "tags": "#shorts #heist",
+        })
+        result = _parse_response(raw, "heists", "hook")
+        assert "HOW AN APPLE CRACKED A VAULT" in result.hook_header
+        assert result.hook_category == "UNSOLVED HEIST"
+

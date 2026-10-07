@@ -52,6 +52,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THE $100M DIAMOND HEIST SOLVED BY A SANDWICH",
+            hook_header="THE $100M SANDWICH HEIST 🥪💎",
+            hook_category="TRUE CRIME ARCHIVE",
             script=(
                 "In 2003, an Italian thief bypassed ten layers of vault security in Antwerp to steal one hundred million dollars in diamonds. "
                 "He used hairspray to blind heat sensors and magnetic tape to trick infrared beams. "
@@ -86,6 +88,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THE 72-SECOND SIGNAL FROM DEEP UNCHARTED SPACE",
+            hook_header="THE 72-SECOND ALIEN SIGNAL 📡🌌",
+            hook_category="CLASSIFIED ANOMALY",
             script=(
                 "On August 15, 1977, a radio telescope in Ohio intercepted an artificial signal from deep space. "
                 "It was thirty times louder than cosmic background noise. "
@@ -125,6 +129,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="HOW RED BULL TRICKED THE ENTIRE WORLD",
+            hook_header="HOW RED BULL CONQUERED THE WORLD 🥫📈",
+            hook_category="MARKETING GENIUS",
             script=(
                 "When Red Bull first launched, absolutely nobody wanted to drink it. "
                 "Competitors had millions in advertising, while Red Bull was on the brink of bankruptcy. "
@@ -157,6 +163,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THE 3-SECOND FBI TRICK THAT EXPOSES LIARS",
+            hook_header="THE 3-SECOND FBI SILENCE TRICK 🤫⚠️",
+            hook_category="FBI INTERROGATION",
             script=(
                 "When an FBI interrogator suspects someone is lying, they never argue. "
                 "Instead, they repeat the suspect's last three words as a question, then maintain complete silence. "
@@ -197,6 +205,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THEY ARE WATCHING YOU RIGHT NOW",
+            hook_header="THEY ARE WATCHING YOU RIGHT NOW 👁️🌑",
+            hook_category="CLASSIFIED RECORD",
             script=(
                 "Don't look behind you. The shadows in your room shift when you blink. "
                 "Three people reported seeing a figure standing in the corner of their "
@@ -231,6 +241,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THE ONE HABIT THAT WILL CHANGE YOUR LIFE",
+            hook_header="ONE HABIT SEPARATES WINNERS 🏆🔥",
+            hook_category="UNCOMFORTABLE TRUTH",
             script=(
                 "Nobody will tell you this. Discipline is not something you feel. "
                 "It is something you build, brick by brick, on the days you least want "
@@ -266,6 +278,8 @@ NICHE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "fallback": ContentResult(
             title="THE FACT THEY DON'T WANT YOU TO KNOW",
+            hook_header="YOUR MEMORY IS A COMPLETE LIE 🧠⚠️",
+            hook_category="MIND-BLOWING FACT",
             script=(
                 "You were never taught this in school. The human brain cannot "
                 "distinguish between a vivid memory and a real event. Every memory "
@@ -333,12 +347,16 @@ TASK:
    - NO generic stock actors or AI clichés.
 
 2. Write a short, ALL-CAPS clickbait title (under 10 words).
-3. Provide one primary English keyword for fallback background video.
-4. Provide 8-12 viral hashtags.
+3. "hook_header": A 3 to 6 word ALL-CAPS high-curiosity hook with 1-2 emojis designed to be rendered as a bold caution banner at the top of the video (e.g. "THE $100M APPLE HEIST 🍏🔒", "FBI 3-SECOND SILENCE TRICK 🤫⚠️").
+4. "hook_category": A 2 to 3 word uppercase category pill badge (e.g. "CLASSIFIED FILE", "TRUE CRIME ARCHIVE", "UNSOLVED HEIST").
+5. Provide one primary English keyword for fallback background video.
+6. Provide 8-12 viral hashtags.
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
   "title": "ALL-CAPS VIRAL TITLE",
+  "hook_header": "THE $100M APPLE HEIST 🍏🔒",
+  "hook_category": "CLASSIFIED CASE",
   "script": "Full narrative text...",
   "visual_search": "primary_keyword",
   "tags": "#shorts #topic #viral",
@@ -419,10 +437,22 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
 6. PHYSICAL NOUNS FOR VISUAL QUERIES (CRITICAL):
    - "visual_search" and EVERY "visual_query" MUST consist of CONCRETE, PHYSICAL NOUNS (e.g. "art museum gallery", "framed classical oil painting", "empty picture frame hanging on museum wall", "bank vault steel door", "police investigation tape", "museum security camera").
    - NEVER use abstract adjectives or journalistic buzzwords: "high-profile", "highprofile", "uptick", "shocking", "unbelievable", "mysterious", "secret", "crisis". Search engines cannot search abstract adjectives and will return fashion models or curtains. ONLY use concrete physical nouns!
+7. NEUROMARKETING RETENTION & 0.4-SECOND HOOK LAW (CRITICAL):
+   - 70%+ of short-form viewers swipe in the first 0.8 seconds if they are not shocked by a contradiction.
+   - SENTENCE 1 (SCENE 1) MUST IMMEDIATELY INTRODUCE AN IMPOSSIBLE COGNITIVE GAP:
+     * Formula: [ABSURD EVERYDAY OBJECT/DETAIL] + [EXTREME HIGH-STAKES SYSTEM/RECORD/HEIST]
+     * e.g. "This $1 apple just bypassed a 100-million-dollar biometric laser grid."
+     * e.g. "Two men walked into a Boston museum with duct tape, and stole $500 million in 81 minutes."
+     * NEVER start with slow setup ("In 2003, an Italian thief...", "Throughout history...").
+   - SCENE 1 VISUAL QUERY: Must NOT be an empty room or dark closed door. It MUST portray the physical paradox with vivid lighting/contrast (e.g. "macro close up shiny red apple against glowing biometric laser keypad" or "empty gilded picture frame museum gallery with red alarm lights").
+   - "hook_header": Provide a 3 to 6 word ALL-CAPS curiosity headline with 1-2 emojis for a giant caution banner at the top of the video (e.g. "THE $100M APPLE HEIST 🍏🔒", "FBI 3-SECOND SILENCE TRICK 🤫⚠️").
+   - "hook_category": Provide a 2 to 3 word uppercase category tag for the red pill badge (e.g. "CLASSIFIED CASE", "TRUE CRIME ARCHIVE", "UNSOLVED HEIST").
 
 RESPOND ONLY with valid JSON in this exact structure (no markdown fences):
 {{
   "title": "ALL-CAPS VIRAL THRILLER TITLE",
+  "hook_header": "THE $100M APPLE HEIST 🍏🔒",
+  "hook_category": "CLASSIFIED CASE",
   "script": "Full narrative script...",
   "visual_search": "primary concrete physical subject noun directly describing {topic}",
   "tags": "#shorts #trending #viral #mystery",
@@ -563,6 +593,36 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
     if not scenes:
         scenes = _split_into_scenes(script, visual_search)
 
+    # Parse or synthesize neuromarketing hook header & category
+    hook_header = clean_text(data.get("hook_header", ""))
+    if not hook_header:
+        clean_t = re.sub(r"#\w+", "", title).strip()
+        words = clean_t.split()
+        hook_header = " ".join(words[:6]).upper()
+        if niche == "heists":
+            hook_header += " 💰🔒"
+        elif niche == "glitches":
+            hook_header += " 👁️⚡"
+        elif niche == "dark_psychology":
+            hook_header += " 🧠🤫"
+        elif niche == "horror":
+            hook_header += " ⚠️💀"
+        else:
+            hook_header += " 🤯🔥"
+
+    hook_category = clean_text(data.get("hook_category", ""))
+    if not hook_category:
+        niche_cats = {
+            "heists": "UNSOLVED HEIST",
+            "glitches": "GLITCH IN MATRIX",
+            "business": "RUTHLESS MOVE",
+            "dark_psychology": "FBI MIND TRICK",
+            "horror": "CLASSIFIED ARCHIVE",
+            "motivation": "UNCOMFORTABLE TRUTH",
+            "facts": "MIND-BLOWING FACT",
+        }
+        hook_category = niche_cats.get(niche, "CLASSIFIED CASE")
+
     return ContentResult(
         title=title,
         script=script,
@@ -570,6 +630,8 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
         tags=tags,
         niche=niche,
         hook=hook,
+        hook_header=hook_header,
+        hook_category=hook_category,
         scenes=scenes,
     )
 

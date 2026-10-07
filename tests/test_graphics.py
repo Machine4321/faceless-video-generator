@@ -134,3 +134,20 @@ def test_render_animated_counter_video(tmp_path):
     assert os.path.isfile(out)
     assert os.path.getsize(out) > 1000
 
+
+def test_render_hook_banner_frame():
+    from shadowvault.graphics import render_hook_banner_frame
+    import numpy as np
+
+    frame = render_hook_banner_frame(
+        headline="THE $100M APPLE HEIST",
+        category="CLASSIFIED CASE",
+        canvas_w=1080,
+        canvas_h=1920,
+    )
+    assert isinstance(frame, np.ndarray)
+    assert frame.shape == (1920, 1080, 4)
+    # Check that alpha channel has non-transparent pixels
+    assert np.max(frame[:, :, 3]) > 200
+
+

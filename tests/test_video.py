@@ -351,3 +351,28 @@ class TestComposeVideo:
             output_folder=output_dir,
         )
         assert os.path.isdir(output_dir)
+
+
+class TestHookBannerClip:
+    def test_build_hook_banner_clip_returns_clip(self):
+        from shadowvault.video import _build_hook_banner_clip
+        from moviepy.editor import ImageClip
+
+        clip = _build_hook_banner_clip(
+            hook_header="THE $100M APPLE HEIST 🍏🔒",
+            hook_category="CLASSIFIED CASE",
+            duration=3.5,
+            output_width=1080,
+            output_height=1920,
+        )
+        assert clip is not None
+        assert isinstance(clip, ImageClip)
+        assert clip.start == 0.0
+        assert clip.duration == 3.5
+
+    def test_build_hook_banner_clip_empty_returns_none(self):
+        from shadowvault.video import _build_hook_banner_clip
+
+        assert _build_hook_banner_clip("") is None
+        assert _build_hook_banner_clip("   ") is None
+
