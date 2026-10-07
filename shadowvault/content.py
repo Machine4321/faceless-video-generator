@@ -423,11 +423,12 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
 3. DOUBLED VISUAL RHYTHM ({num_scenes} FAST-PACED MICRO-SCENES):
    - Modern viewers drop off if a scene holds longer than 2.5 seconds.
    - Break the script into {num_scenes} sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.5 seconds).
-4. RELENTLESS PACING & SEAMLESS LOOP:
+4. RELENTLESS PACING & CONJUNCTION INFINITE LOOP (CRITICAL RETENTION MULTIPLIER):
    - Total narration: ~{word_count} words ({target_dur}).
    - The cold open starts immediately in-media-res with an unbelievable recorded fact.
    {arc_instruction}
-   - The final sentence delivers a bone-chilling twist or connects back seamlessly to the first sentence for infinite loop retention.
+   - THE CONJUNCTION INFINITE LOOP (MANDATORY): The very last sentence MUST end with an open connector, preposition, or dependent clause (e.g. "...which is why nobody was prepared for...", "...and that is the exact reason why...", "...leaving investigators with the chilling question of...") that grammatically and seamlessly completes into Sentence 1 when the video loops.
+   - NEVER say "Subscribe", "Comment below", or use any traditional outro—the video must loop infinitely and imperceptibly to drive Average Percentage Viewed past 100%!
 5. TRUE CRIME & HEISTS MANDATE (WHEN TOPIC INVOLVES HEISTS, ROBBERIES, THEFT, ART, OR INVESTIGATIONS):
    - ZERO ABSTRACT FLUFF: Never talk about generic museum security procedures, guard checklists, or abstract statistics.
    - GROUND IMMEDIATELY IN A LEGENDARY SPECIFIC CASE:

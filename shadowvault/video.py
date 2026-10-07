@@ -163,25 +163,57 @@ def _detect_emoji(words: Sequence[str]) -> Optional[str]:
     return None
 
 
+def _render_cinematic_vignette(width: int = 1080, height: int = 1920, intensity: float = 0.65) -> np.ndarray:
+    """
+    Generate a smooth 32-bit RGBA radial vignette frame.
+    Gradually darkens edges & corners to focus attention on the center.
+    Uses vectorized numpy meshgrid for ultra-fast (<50ms) execution.
+    """
+    y, x = np.ogrid[:height, :width]
+    cx, cy = width / 2.0, height / 2.0
+    dx = (x - cx) / cx
+    dy = (y - cy) / cy
+    r = np.sqrt(dx**2 + dy**2)
+    # Radial falloff starts at 0.50 radius from center
+    falloff = np.clip((r - 0.50) / (1.38 - 0.50), 0.0, 1.0)
+    smooth_falloff = 0.5 - 0.5 * np.cos(falloff * np.pi)
+    alpha = (smooth_falloff * (255 * intensity)).astype(np.uint8)
+
+    # Subtle top & bottom edge shading (for UI readability and letterbox focus)
+    top_edge = np.clip((1.0 - (y / (height * 0.14))), 0.0, 1.0)
+    bot_edge = np.clip((y - height * 0.82) / (height * 0.18), 0.0, 1.0)
+    edge_alpha = ((top_edge**1.5 + bot_edge**1.5) * 140).astype(np.uint8)
+
+    final_alpha = np.maximum(alpha, edge_alpha)
+
+    rgba = np.zeros((height, width, 4), dtype=np.uint8)
+    rgba[..., 0] = 4
+    rgba[..., 1] = 6
+    rgba[..., 2] = 10
+    rgba[..., 3] = final_alpha
+    return rgba
+
+
 def _render_kinetic_chunk_frame(
     words_in_chunk: list[str],
     active_idx: int,
     canvas_w: int,
     canvas_h: int,
-    font_size: int = 76,
-    active_color: tuple = (255, 229, 0),    # Vibrant Yellow (#FFE500)
-    inactive_color: tuple = (255, 255, 255), # Pure White
+    font_size: int = 78,
+    active_color: tuple = (255, 230, 0),    # Vibrant Neon Yellow (#FFE600)
+    inactive_color: tuple = (255, 255, 255), # Pure Crisp White
     stroke_color: tuple = (0, 0, 0),         # Black Outline
     stroke_width: int = 6,
 ) -> np.ndarray:
     """
     Render a kinetic subtitle frame where `active_idx` word is highlighted in active_color.
-    Includes drop-shadow and optional context emoji.
+    Includes drop-shadow, active-word glowing focus badge (Hormozi/Zack D. style),
+    and optional context emoji.
     """
     img = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     font = _load_font(font_size, bold=True)
-    active_font = _load_font(int(font_size * 1.10), bold=True)
+    active_font = _load_font(int(font_size * 1.15), bold=True)
     emoji = _detect_emoji(words_in_chunk)
 
     # Measure each word and spacing (active word uses active_font)
@@ -194,16 +226,15 @@ def _render_kinetic_chunk_frame(
 
     total_w = sum(word_widths) + space_w * (len(words_in_chunk) - 1)
     start_x = (canvas_w - total_w) // 2
-    base_y = canvas_h // 2
+    base_y = canvas_h // 2 + 10
 
     # Draw Emoji above the chunk ONLY if supported emoji font exists
-    # This prevents the missing-glyph empty box [▯] bug on Windows/Linux
     if emoji:
         emoji_font = _load_emoji_font(font_size)
         if emoji_font is not None:
             try:
                 draw.text(
-                    (canvas_w // 2, base_y - font_size - 15),
+                    (canvas_w // 2, base_y - font_size - 18),
                     emoji,
                     font=emoji_font,
                     anchor="mm",
@@ -213,12 +244,31 @@ def _render_kinetic_chunk_frame(
                 pass
 
     # Stylish translucent rounded pill behind the chunk to guarantee 100% contrast on any background
-    pad_x, pad_y = 28, 16
+    pad_x, pad_y = 30, 18
     pill_x0 = start_x - pad_x
     pill_y0 = base_y - font_size // 2 - pad_y
     pill_x1 = start_x + total_w + pad_x
     pill_y1 = base_y + font_size // 2 + pad_y
-    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=20, fill=(0, 0, 0, 160))
+    draw.rounded_rectangle([pill_x0, pill_y0, pill_x1, pill_y1], radius=24, fill=(0, 0, 0, 175), outline=(255, 255, 255, 25), width=1)
+
+    # Active Word Focus Accent Badge (Hormozi / Zack D. Films visual punch)
+    if 0 <= active_idx < len(words_in_chunk):
+        active_x = start_x + sum(word_widths[:active_idx]) + space_w * active_idx
+        active_w = word_widths[active_idx]
+        b_pad_x = 12
+        b_pad_y = 6
+        draw.rounded_rectangle(
+            [
+                active_x - b_pad_x,
+                pill_y0 + b_pad_y,
+                active_x + active_w + b_pad_x,
+                pill_y1 - b_pad_y,
+            ],
+            radius=16,
+            fill=(255, 230, 0, 45),
+            outline=(255, 230, 0, 220),
+            width=2,
+        )
 
     # Draw Words horizontally with drop shadow & active bounce pop
     curr_x = start_x
@@ -234,10 +284,10 @@ def _render_kinetic_chunk_frame(
             (curr_x + 3, word_y + 4),
             word.upper(),
             font=f,
-            fill=(0, 0, 0, 180),
+            fill=(0, 0, 0, 200),
             anchor="lm",
             stroke_width=s_width,
-            stroke_fill=(0, 0, 0, 180),
+            stroke_fill=(0, 0, 0, 200),
         )
 
         # Foreground word with thick outline
@@ -961,7 +1011,15 @@ def compose_video(
             output_height=output_height,
         )
 
-    all_layers = [bg] + sub_clips
+    # 4.5 Atmospheric Cinematic Lens Vignette (locks focus on center, 35mm documentary depth)
+    vignette_frame = _render_cinematic_vignette(output_width, output_height, intensity=0.65)
+    vignette_clip = (
+        ImageClip(vignette_frame)
+        .set_duration(total_duration)
+        .set_position((0, 0))
+    )
+
+    all_layers = [bg, vignette_clip] + sub_clips
     if hook_clip is not None:
         all_layers.append(hook_clip)
 
@@ -975,7 +1033,7 @@ def compose_video(
         )
         all_layers.append(watermark_clip)
 
-    # 5. Composite Final Master
+    # 6. Composite Final Master
     final_video = CompositeVideoClip(all_layers, size=(output_width, output_height))
 
     logger.info("Rendering master video -> %s", output_path)
@@ -994,6 +1052,10 @@ def compose_video(
         # Explicitly release open file locks on Windows
         try:
             final_video.close()
+        except Exception:
+            pass
+        try:
+            vignette_clip.close()
         except Exception:
             pass
         if hasattr(bg, "clips"):

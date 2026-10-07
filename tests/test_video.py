@@ -9,6 +9,8 @@ import pytest
 from shadowvault.video import (
     _load_font,
     _render_subtitle_frame,
+    _render_kinetic_chunk_frame,
+    _render_cinematic_vignette,
     _render_watermark_frame,
     _build_subtitle_clips,
     _mix_audio,
@@ -76,6 +78,52 @@ class TestRenderSubtitleFrame:
         frame = _render_subtitle_frame("VISIBLE TEXT", 1080, 480)
         alpha_channel = frame[:, :, 3]
         assert alpha_channel.max() > 0
+
+
+# ---------------------------------------------------------------------------
+# _render_kinetic_chunk_frame
+# ---------------------------------------------------------------------------
+
+class TestRenderKineticChunkFrame:
+    def test_returns_rgba_array(self):
+        words = ["STOLE", "$100M", "FROM", "VAULT"]
+        frame = _render_kinetic_chunk_frame(words, active_idx=1, canvas_w=1080, canvas_h=360)
+        assert isinstance(frame, np.ndarray)
+        assert frame.shape == (360, 1080, 4)
+        alpha = frame[:, :, 3]
+        assert alpha.max() > 0
+
+    def test_first_word_active(self):
+        words = ["FIRST", "SECOND"]
+        frame = _render_kinetic_chunk_frame(words, active_idx=0, canvas_w=1080, canvas_h=360)
+        assert frame.shape == (360, 1080, 4)
+        assert frame[:, :, 3].max() > 0
+
+    def test_single_word_active(self):
+        words = ["ALONE"]
+        frame = _render_kinetic_chunk_frame(words, active_idx=0, canvas_w=1080, canvas_h=360)
+        assert frame.shape == (360, 1080, 4)
+
+
+# ---------------------------------------------------------------------------
+# _render_cinematic_vignette
+# ---------------------------------------------------------------------------
+
+class TestRenderCinematicVignette:
+    def test_returns_correct_shape(self):
+        vignette = _render_cinematic_vignette(width=1080, height=1920, intensity=0.65)
+        assert isinstance(vignette, np.ndarray)
+        assert vignette.shape == (1920, 1080, 4)
+
+    def test_center_is_substantially_transparent(self):
+        vignette = _render_cinematic_vignette(width=1080, height=1920, intensity=0.65)
+        center_alpha = vignette[1920 // 2, 1080 // 2, 3]
+        assert center_alpha == 0  # Center focal point has zero obstruction
+
+    def test_corners_have_vignette_darkening(self):
+        vignette = _render_cinematic_vignette(width=1080, height=1920, intensity=0.65)
+        corner_alpha = vignette[0, 0, 3]
+        assert corner_alpha > 100  # Strong cinematic darkening at corners
 
 
 # ---------------------------------------------------------------------------
