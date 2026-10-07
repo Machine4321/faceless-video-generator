@@ -165,6 +165,52 @@ def _measure_duration(audio_path: str) -> float:
         return 0.0
 
 
+def apply_hollywood_mastering(
+    input_path: str,
+    output_path: Optional[str] = None,
+) -> str:
+    """
+    Apply broadcast-grade Hollywood documentary vocal mastering via FFmpeg:
+    - High-pass filter at 75Hz (removes low-end rumble/thumps)
+    - Proximity Bass Boost at 120Hz (+3.5dB) for deep, rich chest resonance
+    - Presence & Intelligibility Boost at 3.5kHz (+2.5dB) for crisp clarity through phone speakers
+    - High-shelf air boost at 10kHz (+1.5dB) for breath presence
+    - Dynamic multiband compressor (acompressor): fast attack (5ms), release (60ms), ratio 4:1, threshold -16dB
+    - Loudness normalization (loudnorm) targeting -14 LUFS with True Peak -1.0 dB (YouTube Shorts & TikTok standard)
+    """
+    if not os.path.exists(input_path):
+        return input_path
+
+    target_path = output_path or input_path.replace(".mp3", "_mastered.mp3")
+    filter_chain = (
+        "highpass=f=75,"
+        "equalizer=f=120:width_type=o:width=1.2:g=3.5,"
+        "equalizer=f=3500:width_type=o:width=1.0:g=2.5,"
+        "equalizer=f=10000:width_type=o:width=1.0:g=1.5,"
+        "acompressor=threshold=-16dB:ratio=4:attack=5:release=60:makeup=2,"
+        "loudnorm=I=-14:TP=-1.0:LRA=7"
+    )
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-af", filter_chain,
+        "-c:a", "libmp3lame",
+        "-b:a", "192k",
+        target_path,
+    ]
+    try:
+        import subprocess
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=True)
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 1000:
+            logger.info("Applied Hollywood vocal mastering -> %s", target_path)
+            return target_path
+    except Exception as exc:
+        logger.warning("Hollywood mastering failed, falling back to raw audio: %s", exc)
+
+    return input_path
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -175,6 +221,7 @@ async def generate_audio_async(
     rate: str | None = None,
     pitch: str | None = None,
     temp_dir: str | None = None,
+    master: bool = True,
 ) -> AudioResult:
     """
     Generate TTS audio asynchronously with word-level synchronization.
@@ -214,6 +261,12 @@ async def generate_audio_async(
     except Exception as exc:
         logger.error("TTS synthesis failed: %s", exc)
         return AudioResult(audio_path="", duration=0.0, voice=voice)
+
+    # Apply Hollywood vocal mastering chain
+    if master and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+        mastered_path = apply_hollywood_mastering(output_path)
+        if mastered_path != output_path and os.path.exists(mastered_path):
+            output_path = mastered_path
 
     duration = _measure_duration(output_path)
     logger.info("Audio duration: %.2fs", duration)

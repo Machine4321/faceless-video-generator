@@ -138,3 +138,27 @@ class TestGenerateAudioSync:
         result = generate_audio("Test")
         assert result.audio_path == ""
         assert result.duration == 0.0
+
+
+# ---------------------------------------------------------------------------
+# apply_hollywood_mastering
+# ---------------------------------------------------------------------------
+
+class TestApplyHollywoodMastering:
+    def test_missing_input_returns_input(self):
+        from shadowvault.audio import apply_hollywood_mastering
+        res = apply_hollywood_mastering("nonexistent_file.mp3")
+        assert res == "nonexistent_file.mp3"
+
+    @patch("subprocess.run")
+    def test_successful_mastering(self, mock_run, tmp_path):
+        from shadowvault.audio import apply_hollywood_mastering
+        inp = tmp_path / "voice.mp3"
+        inp.write_bytes(b"dummy audio data" * 100)
+        out = tmp_path / "voice_mastered.mp3"
+        out.write_bytes(b"mastered audio data" * 100)
+
+        res = apply_hollywood_mastering(str(inp), str(out))
+        assert res == str(out)
+        mock_run.assert_called_once()
+
