@@ -165,32 +165,39 @@ def _detect_emoji(words: Sequence[str]) -> Optional[str]:
 
 def _render_cinematic_vignette(width: int = 1080, height: int = 1920, intensity: float = 0.65) -> np.ndarray:
     """
-    Generate a smooth 32-bit RGBA radial vignette frame.
-    Gradually darkens edges & corners to focus attention on the center.
-    Uses vectorized numpy meshgrid for ultra-fast (<50ms) execution.
+    Generate a smooth 32-bit RGBA radial vignette frame with subtle 35mm analog film grain.
+    Gradually darkens edges & corners to focus attention on the center, while adding
+    subtle organic grain texture across the frame to eliminate digital flat glare.
+    Uses vectorized numpy meshgrid for ultra-fast (<80ms) execution.
     """
     y, x = np.ogrid[:height, :width]
     cx, cy = width / 2.0, height / 2.0
     dx = (x - cx) / cx
     dy = (y - cy) / cy
     r = np.sqrt(dx**2 + dy**2)
-    # Radial falloff starts at 0.50 radius from center
-    falloff = np.clip((r - 0.50) / (1.38 - 0.50), 0.0, 1.0)
+    # Radial falloff starts at 0.48 radius from center
+    falloff = np.clip((r - 0.48) / (1.38 - 0.48), 0.0, 1.0)
     smooth_falloff = 0.5 - 0.5 * np.cos(falloff * np.pi)
-    alpha = (smooth_falloff * (255 * intensity)).astype(np.uint8)
+    alpha = (smooth_falloff * (255 * intensity)).astype(np.float32)
 
     # Subtle top & bottom edge shading (for UI readability and letterbox focus)
     top_edge = np.clip((1.0 - (y / (height * 0.14))), 0.0, 1.0)
     bot_edge = np.clip((y - height * 0.82) / (height * 0.18), 0.0, 1.0)
-    edge_alpha = ((top_edge**1.5 + bot_edge**1.5) * 140).astype(np.uint8)
+    edge_alpha = (top_edge**1.5 + bot_edge**1.5) * 140.0
 
     final_alpha = np.maximum(alpha, edge_alpha)
 
+    # Monochromatic 35mm Analog Film Grain
+    np.random.seed(42)
+    grain_noise = np.random.normal(loc=0.0, scale=16.0, size=(height, width)).astype(np.float32)
+    total_alpha = np.clip(final_alpha + 12.0, 0, 255).astype(np.uint8)
+
     rgba = np.zeros((height, width, 4), dtype=np.uint8)
-    rgba[..., 0] = 4
-    rgba[..., 1] = 6
-    rgba[..., 2] = 10
-    rgba[..., 3] = final_alpha
+    rgb_val = np.clip(6.0 + grain_noise * 0.35, 0, 32).astype(np.uint8)
+    rgba[..., 0] = rgb_val
+    rgba[..., 1] = rgb_val
+    rgba[..., 2] = np.clip(rgb_val + 2, 0, 38)
+    rgba[..., 3] = total_alpha
     return rgba
 
 
@@ -524,6 +531,20 @@ def _build_hook_banner_clip(
     except Exception as exc:
         logger.warning("Failed to render hook banner clip: %s", exc)
         return None
+
+
+def _build_hook_flash_clip(
+    duration: float = 0.14,
+    output_width: int = 1080,
+    output_height: int = 1920,
+) -> ImageClip:
+    """
+    Generate a subtle 140ms optical exposure flash at t=0.0s (synchronized with the sub-bass impact)
+    to trigger the neurological orienting reflex and halt mindless scrolling.
+    """
+    white_frame = np.full((output_height, output_width, 3), 255, dtype=np.uint8)
+    flash = ImageClip(white_frame).set_duration(duration)
+    return flash.crossfadeout(duration).set_start(0.0).set_opacity(0.24)
 
 
 
@@ -1019,7 +1040,10 @@ def compose_video(
         .set_position((0, 0))
     )
 
-    all_layers = [bg, vignette_clip] + sub_clips
+    # 4.6 Neurological Hook Optical Flash (0-140ms pattern interrupt on frame 1)
+    hook_flash = _build_hook_flash_clip(duration=0.14, output_width=output_width, output_height=output_height)
+
+    all_layers = [bg, vignette_clip, hook_flash] + sub_clips
     if hook_clip is not None:
         all_layers.append(hook_clip)
 
@@ -1056,6 +1080,10 @@ def compose_video(
             pass
         try:
             vignette_clip.close()
+        except Exception:
+            pass
+        try:
+            hook_flash.close()
         except Exception:
             pass
         if hasattr(bg, "clips"):

@@ -11,6 +11,7 @@ from shadowvault.video import (
     _render_subtitle_frame,
     _render_kinetic_chunk_frame,
     _render_cinematic_vignette,
+    _build_hook_flash_clip,
     _render_watermark_frame,
     _build_subtitle_clips,
     _mix_audio,
@@ -118,12 +119,24 @@ class TestRenderCinematicVignette:
     def test_center_is_substantially_transparent(self):
         vignette = _render_cinematic_vignette(width=1080, height=1920, intensity=0.65)
         center_alpha = vignette[1920 // 2, 1080 // 2, 3]
-        assert center_alpha == 0  # Center focal point has zero obstruction
+        assert center_alpha <= 16  # Center focal point has only fine subtle 35mm grain (<=16 alpha)
 
     def test_corners_have_vignette_darkening(self):
         vignette = _render_cinematic_vignette(width=1080, height=1920, intensity=0.65)
         corner_alpha = vignette[0, 0, 3]
         assert corner_alpha > 100  # Strong cinematic darkening at corners
+
+
+# ---------------------------------------------------------------------------
+# _build_hook_flash_clip
+# ---------------------------------------------------------------------------
+
+class TestHookFlashClip:
+    def test_build_hook_flash_clip_returns_clip(self):
+        clip = _build_hook_flash_clip(duration=0.14, output_width=1080, output_height=1920)
+        assert clip is not None
+        assert clip.duration == 0.14
+        assert clip.start == 0.0
 
 
 # ---------------------------------------------------------------------------
