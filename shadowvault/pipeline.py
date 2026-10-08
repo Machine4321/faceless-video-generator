@@ -410,7 +410,8 @@ def main() -> None:
         print("=" * 50)
         print(f"Run ID   : {result.run_id}")
         if result.content:
-            print(f"Title    : {result.content.title}")
+            safe_title = (result.content.title or "").encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8")
+            print(f"Title    : {safe_title}")
         if result.video:
             print(f"Video    : {result.video.video_path}")
         if result.metadata_path:
