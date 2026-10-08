@@ -343,7 +343,7 @@ TASK:
    - First sentence is the explosive hook (already given).
    {arc_instruction}
    - DOUBLE THE VISUAL RHYTHM: Divide the story into {num_scenes} sequential micro-scenes (each cut 4-8 words, ~1.8-2.5 seconds).
-   - Use high-contrast documentary formats across scenes: "ai_image", "radar", "dossier", "counter", "newspaper".
+   - Use high-contrast cinematic visual formats across scenes: "ai_image", "photo", "video", "newspaper". Avoid artificial counters or radar scopes.
    - NO generic stock actors or AI clichés.
 
 2. Write a short, ALL-CAPS clickbait title (under 10 words).
@@ -398,8 +398,8 @@ def _build_trend_prompt(topic: str, summary: str, length: str = "short") -> str:
     )
 
     return f"""\
-You are an elite viral documentary director (MagnatesMedia, Vox, Johnny Harris, Lemmino level).
-Your videos achieve 95%+ watch-time retention and millions of shares because you eliminate all generic AI fluff and structure every single second with rapid visual cuts and verifiable facts.
+You are a master viral TikTok & YouTube Shorts mystery storyteller (MrBallen, Nick Crowley style).
+Your videos achieve 95%+ watch-time and thousands of shares because you tell gripping, suspenseful human stories, unbelievable crimes, and forbidden true events with breathless pacing and high emotional stakes.
 
 VIRAL TOPIC: {topic}
 CONTEXT & DETAILS: {summary}
@@ -407,7 +407,7 @@ CONTEXT & DETAILS: {summary}
 MANDATORY JOURNALISTIC & RETENTION RULES:
 1. ZERO AI CLICHÉS (STRICTLY BANNED):
    - NEVER use: "Did you know", "Imagine", "they don't want you to know", "fed a lie", "leaving us to wonder", "shocking secret", "unravel the mystery".
-   - Write like a top-tier investigative journalist: cite exact years, exact locations, exact names, exact frequencies/tempos/stats, and verified records.
+   - Write with intense narrative suspense and human intrigue: ground the story in real people, insane audacity, real locations, and unbelievable true details.
 2. CRITICAL TOPIC RELEVANCE & VISUAL SYNCHRONIZATION:
    - The topic is: "{topic}". EVERY SINGLE SCENE must directly portray and describe this specific subject.
    - Do NOT hallucinate dark crime archives, space telescopes, or laboratories unless the topic is literally about space or laboratories!
@@ -416,15 +416,15 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
      * "ai_image": Ultra-detailed cinematic photograph depicting the exact action of {topic}.
      * "photo": Archival or high-resolution photography of {topic}.
      * "video": Motion footage of {topic}.
-     * "counter": Use when narrating a quantifiable metric or record. CRITICAL: When visual_format is "counter", the narration MUST speak the exact number and unit (e.g. "$500 million", "180 beats per minute", "13 masterpieces", "81 minutes").
      * "newspaper": Use for breaking news, competition headline, or public sensation about {topic}.
      * "dossier": ONLY if {topic} involves classified intelligence or crime. Otherwise use "ai_image" or "photo".
-     * "radar": ONLY if {topic} involves radio frequencies, astronomy, or radar telemetry. Otherwise use "ai_image" or "photo".
+     * Keep visuals 100% cinematic, atmospheric, and photographic ("ai_image", "photo", "video"). Avoid synthetic counter or radar graphics.
 3. DOUBLED VISUAL RHYTHM ({num_scenes} FAST-PACED MICRO-SCENES):
    - Modern viewers drop off if a scene holds longer than 2.5 seconds.
    - Break the script into {num_scenes} sequential micro-scenes (each scene is one punchy clause of 4 to 8 words, lasting ~1.8 to 2.5 seconds).
-4. RELENTLESS PACING & CONJUNCTION INFINITE LOOP (CRITICAL RETENTION MULTIPLIER):
-   - Total narration: ~{word_count} words ({target_dur}).
+4. RELENTLESS PACING, MANDATORY LENGTH & CONJUNCTION INFINITE LOOP:
+   - STRICT WORD COUNT REQUIREMENT: Total narration MUST be between {word_count - 10} and {word_count + 15} words ({target_dur}). NEVER generate under 50 words!
+   - Each of the {num_scenes} scenes MUST contain a full, descriptive, punchy sentence (6 to 10 words per scene).
    - The cold open starts immediately in-media-res with an unbelievable recorded fact.
    {arc_instruction}
    - THE CONJUNCTION INFINITE LOOP (MANDATORY): The very last sentence MUST end with an open connector, preposition, or dependent clause (e.g. "...which is why nobody was prepared for...", "...and that is the exact reason why...", "...leaving investigators with the chilling question of...") that grammatically and seamlessly completes into Sentence 1 when the video loops.
@@ -434,7 +434,6 @@ MANDATORY JOURNALISTIC & RETENTION RULES:
    - GROUND IMMEDIATELY IN A LEGENDARY SPECIFIC CASE:
      * For art heists: Anchor immediately on the $500,000,000 Isabella Stewart Gardner Museum heist in Boston (two thieves disguised as police officers walked in at 1:24 AM, handcuffed guards with duct tape in the basement, cut 13 priceless masterpieces including Rembrandt and Vermeer out of their gilded frames in 81 minutes, and vanished forever; for 34 years the empty frames still hang on the gallery walls, and a $10M FBI bounty remains unclaimed).
      * Reveal the dark underworld secret: high-profile masterpieces can NEVER be sold on the open market—they become shadow underworld currency and collateral traded between international drug cartels and syndicates.
-   - MANDATORY EXACT NUMBERS IN COUNTER SCENE: If using "counter", state the exact dollar value (e.g. "$500 million", "$100 million") or exact count (e.g. "13 masterpieces stolen", "81 minutes").
 6. PHYSICAL NOUNS FOR VISUAL QUERIES (CRITICAL):
    - "visual_search" and EVERY "visual_query" MUST consist of CONCRETE, PHYSICAL NOUNS (e.g. "art museum gallery", "framed classical oil painting", "empty picture frame hanging on museum wall", "bank vault steel door", "police investigation tape", "museum security camera").
    - NEVER use abstract adjectives or journalistic buzzwords: "high-profile", "highprofile", "uptick", "shocking", "unbelievable", "mysterious", "secret", "crisis". Search engines cannot search abstract adjectives and will return fashion models or curtains. ONLY use concrete physical nouns!
@@ -593,6 +592,13 @@ def _parse_response(raw: str, niche: str, hook: str) -> ContentResult:
 
     if not scenes:
         scenes = _split_into_scenes(script, visual_search)
+    else:
+        # Guarantee script consistency with scene narrations
+        scene_narrations = [sc.narration.strip() for sc in scenes if sc.narration.strip()]
+        if scene_narrations:
+            full_scenes_script = " ".join(scene_narrations)
+            if len(full_scenes_script.split()) > len(script.split()):
+                script = full_scenes_script
 
     # Parse or synthesize neuromarketing hook header & category
     hook_header = clean_text(data.get("hook_header", ""))

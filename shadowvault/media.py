@@ -317,14 +317,7 @@ def fetch_scene_media(
 
     # Intelligent format selection when format is 'auto'
     if vformat == "auto":
-        if scene.scene_id == 1 and any(w in text_lower for w in ["sentenced", "arrest", "breaking", "heist", "stole", "found", "shocking", "discovered", "death", "police"]):
-            vformat = "newspaper"
-        elif any(w in text_lower for w in ["fbi", "police", "cia", "secret", "confidential", "classified", "investigation", "dossier", "surveillance", "evidence"]):
-            vformat = "dossier"
-        elif any(w in text_lower for w in ["million", "billion", "dollars", "cash", "$", "worth", "stolen"]) and re.search(r"(\$[\d,]+|\b\d+\s*(?:million|billion)\b)", scene.narration, re.I):
-            vformat = "counter"
-        else:
-            vformat = "ai_image"
+        vformat = "ai_image"
 
     # Guard: Dossier format should ONLY be used for classified intelligence/crime
     if vformat == "dossier":
